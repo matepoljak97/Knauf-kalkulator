@@ -54,17 +54,48 @@ h2 { font-size: 16px; font-weight: 600; margin: 0 0 8px; }
 .layer-title { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
 .layer-note { font-weight: 400; color: #6b6a64; font-size: 13px; }
 .foot { text-align: center; color: #9a988f; font-size: 12px; margin-top: 16px; }
+/* Shape selector */
+.shape-row { display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #e3e1d8; border-radius:10px; padding:12px 16px; margin-bottom:14px; }
+.shape-lbl { font-size:13px; font-weight:600; color:#6b6a64; white-space:nowrap; }
+.shape-btn { display:flex; align-items:center; gap:7px; padding:7px 14px; border:2px solid #cfcdc3; border-radius:8px; background:#fff; font-size:13px; color:#6b6a64; cursor:pointer; }
+.shape-btn.active { border-color:#185fa5; color:#185fa5; background:#f0f7ff; font-weight:600; }
+.shape-btn:hover:not(.active) { border-color:#aaa; background:#f9f8f4; }
+/* Dim sketch */
+.dim-sketch-panel { background:#fff; border:1px solid #e3e1d8; border-radius:10px; padding:10px 14px; margin-bottom:14px; position:relative; }
+#dim-sketch-wrap { position:relative; }
+#dim-inp { position:absolute; width:80px; height:30px; text-align:center; font-size:13px; font-weight:600; border:2px solid #185fa5; border-radius:6px; padding:0 4px; background:#fff; box-shadow:0 3px 12px rgba(0,0,0,.18); z-index:30; display:none; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <p class="main-title">Knauf kalkulator</p>
-  <p class="sub">Upiši dimenzije zida i otvore — pa prebaci između prikaza profila i ploča.</p>
+  <p class="main-title" style="text-align:center">Knauf kalkulator</p>
+  <p class="sub" style="text-align:center">Upiši dimenzije zida i otvore — pa prebaci između prikaza profila i ploča.</p>
+
+  <!-- Shape selector -->
+  <div class="shape-row">
+    <span class="shape-lbl">Oblik zida:</span>
+    <button id="btn-pravokutan" class="shape-btn active" onclick="setOblik('pravokutan')">
+      <svg width="36" height="24" viewBox="0 0 36 24"><rect x="2" y="2" width="32" height="20" fill="none" stroke="currentColor" stroke-width="2" rx="1"/></svg>
+      Pravokutan
+    </button>
+    <button id="btn-trapez" class="shape-btn" onclick="setOblik('trapez')">
+      <svg width="36" height="24" viewBox="0 0 36 24"><polygon points="2,22 34,22 34,8 2,2" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+      Trapez
+    </button>
+  </div>
+
+  <!-- Dim sketch (interactive wall outline) -->
+  <div class="dim-sketch-panel">
+    <div id="dim-sketch-wrap"></div>
+    <input id="dim-inp" type="number" min="10" step="1" onkeydown="dimKeydown(event)" onblur="commitDim()">
+  </div>
 
   <!-- Shared inputs -->
   <div class="inputs">
     <div class="field"><label>Dužina zida (cm)</label><input type="number" id="i-duzina" value="400" min="50" step="1"></div>
-    <div class="field"><label>Visina zida (cm)</label><input type="number" id="i-visina" value="275" min="50" step="1"></div>
+    <div id="visina-wrap" class="field"><label>Visina zida (cm)</label><input type="number" id="i-visina" value="275" min="50" step="1"></div>
+    <div id="visina-L-wrap" class="field" style="display:none"><label>Visina lijevo (cm)</label><input type="number" id="i-visina-L" value="275" min="50" step="1"></div>
+    <div id="visina-D-wrap" class="field" style="display:none"><label>Visina desno (cm)</label><input type="number" id="i-visina-D" value="225" min="50" step="1"></div>
     <div class="field"><label>Tip profila</label>
       <select id="i-tip">
         <option value="CW50" selected>CW50</option>
@@ -164,6 +195,7 @@ function otvorColor(i){ return COLORS[i % COLORS.length]; }
 // ── STATE ────────────────────────────────────────────────────
 var S = {
   duzina_m: 4.0, visina_m: 2.75,
+  oblik: 'pravokutan', visina_L_m: 2.75, visina_D_m: 2.25,
   tip_profila: 'CW75', oblaganje: 'jednostruko',
   duzina_profila_m: 4, visina_ploce_m: 2.0,
   otvori: []
@@ -182,17 +214,106 @@ function findOtvor(id){
 }
 
 function readInputs(){
-  S.duzina_m         = (parseFloat($i('i-duzina').value)  || 400) / 100;
-  S.visina_m         = (parseFloat($i('i-visina').value)  || 275) / 100;
+  S.duzina_m = (parseFloat($i('i-duzina').value) || 400) / 100;
+  if(S.oblik === 'trapez'){
+    S.visina_L_m = (parseFloat($i('i-visina-L').value) || 275) / 100;
+    S.visina_D_m = (parseFloat($i('i-visina-D').value) || 225) / 100;
+    S.visina_m   = Math.max(S.visina_L_m, S.visina_D_m);
+  } else {
+    S.visina_m = (parseFloat($i('i-visina').value) || 275) / 100;
+  }
   S.tip_profila      = $i('i-tip').value;
   S.oblaganje        = $i('i-oblaganje').value;
   S.duzina_profila_m = parseFloat($i('i-durprof').value);
-  S.visina_ploce_m   = (parseFloat($i('i-vispl').value)   || 200) / 100;
+  S.visina_ploce_m   = (parseFloat($i('i-vispl').value) || 200) / 100;
   S.cw_razmak        = $i('i-razmak').value;
 }
 
 function calcRaster(){
   return S.cw_razmak === '41.7' ? 0.417 : 0.625;
+}
+
+// ── WALL SHAPE ────────────────────────────────────────────────
+function wallTopAt(x_m){
+  if(S.oblik !== 'trapez') return S.visina_m;
+  return S.visina_L_m + (S.visina_D_m - S.visina_L_m) * (x_m / S.duzina_m);
+}
+
+function setOblik(oblik){
+  S.oblik = oblik;
+  $i('btn-pravokutan').className = 'shape-btn' + (oblik==='pravokutan' ? ' active' : '');
+  $i('btn-trapez').className     = 'shape-btn' + (oblik==='trapez'     ? ' active' : '');
+  $i('visina-wrap').style.display   = oblik==='pravokutan' ? '' : 'none';
+  $i('visina-L-wrap').style.display = oblik==='trapez' ? '' : 'none';
+  $i('visina-D-wrap').style.display = oblik==='trapez' ? '' : 'none';
+  render();
+}
+
+// ── DIM SKETCH ────────────────────────────────────────────────
+var _editingDim = null;
+
+function drawDimSketch(){
+  var skW=420, skH=110, pL=64, pR=64, pT=18, pB=28;
+  var drawW=skW-pL-pR, drawH=skH-pT-pB;
+  var visinL = S.oblik==='trapez' ? S.visina_L_m : S.visina_m;
+  var visinR = S.oblik==='trapez' ? S.visina_D_m : S.visina_m;
+  var maxH   = Math.max(visinL, visinR);
+  var scX = drawW / S.duzina_m;
+  var scY = drawH / maxH;
+  function X(m){ return r2(pL + m*scX); }
+  function Y(m){ return r2(pT + (maxH-m)*scY); }
+  var pts = X(0)+','+Y(0)+' '+X(S.duzina_m)+','+Y(0)+' '+X(S.duzina_m)+','+Y(visinR)+' '+X(0)+','+Y(visinL);
+  var s = '<svg width="100%" viewBox="0 0 '+skW+' '+skH+'" xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:'+skW+'px">';
+  s += '<polygon points="'+pts+'" fill="#ede9e0" stroke="#2c2c2a" stroke-width="1.5"/>';
+  // Duzina (bottom)
+  s += '<text x="'+X(S.duzina_m/2)+'" y="'+(Y(0)+17)+'" text-anchor="middle" font-size="12" fill="#185fa5" font-weight="600" style="cursor:pointer;user-select:none" onclick="editDim(\'duzina\',event)">'+Math.round(S.duzina_m*100)+' cm</text>';
+  // Visina lijevo
+  var dimLkey = S.oblik==='trapez' ? 'visina_L' : 'visina';
+  s += '<text x="'+(pL-8)+'" y="'+Y(visinL/2)+'" text-anchor="end" dominant-baseline="middle" font-size="12" fill="#185fa5" font-weight="600" style="cursor:pointer;user-select:none" onclick="editDim(\''+dimLkey+'\',event)">'+Math.round(visinL*100)+' cm</text>';
+  // Visina desno (samo trapez)
+  if(S.oblik==='trapez'){
+    s += '<text x="'+(skW-pR+8)+'" y="'+Y(visinR/2)+'" text-anchor="start" dominant-baseline="middle" font-size="12" fill="#185fa5" font-weight="600" style="cursor:pointer;user-select:none" onclick="editDim(\'visina_D\',event)">'+Math.round(visinR*100)+' cm</text>';
+  }
+  s += '</svg>';
+  $i('dim-sketch-wrap').innerHTML = s;
+}
+
+function editDim(dim, event){
+  event.stopPropagation();
+  _editingDim = dim;
+  var inp = $i('dim-inp');
+  var val;
+  if(dim==='duzina')        val = Math.round(S.duzina_m*100);
+  else if(dim==='visina')   val = Math.round(S.visina_m*100);
+  else if(dim==='visina_L') val = Math.round(S.visina_L_m*100);
+  else if(dim==='visina_D') val = Math.round(S.visina_D_m*100);
+  inp.value = val;
+  var wrap = $i('dim-sketch-wrap');
+  var wr = wrap.getBoundingClientRect();
+  var er = event.target.getBoundingClientRect();
+  inp.style.left = r2(er.left - wr.left + er.width/2 - 40) + 'px';
+  inp.style.top  = r2(er.top  - wr.top  - 36) + 'px';
+  inp.style.display = '';
+  inp.focus(); inp.select();
+}
+
+function commitDim(){
+  if(!_editingDim) return;
+  var val = parseFloat($i('dim-inp').value);
+  if(val >= 10){
+    if(_editingDim==='duzina')        $i('i-duzina').value   = val;
+    else if(_editingDim==='visina')   $i('i-visina').value   = val;
+    else if(_editingDim==='visina_L') $i('i-visina-L').value = val;
+    else if(_editingDim==='visina_D') $i('i-visina-D').value = val;
+  }
+  _editingDim = null;
+  $i('dim-inp').style.display = 'none';
+  render();
+}
+
+function dimKeydown(event){
+  if(event.key==='Enter')  { event.preventDefault(); commitDim(); }
+  else if(event.key==='Escape'){ _editingDim=null; $i('dim-inp').style.display='none'; }
 }
 
 // ── OPENINGS UI ──────────────────────────────────────────────
@@ -261,17 +382,28 @@ function calcCWPositions(){
     x = r2(x + raster);
   }
 
-  // Reinforcement around openings
+  // Profili uz otvore: UA za vrata, CW pojačanje za prozore
   for(var i=0;i<S.otvori.length;i++){
     var o = S.otvori[i];
-    var xL = r2(o.x_m), xR = r2(o.x_m + o.sirina_m);
-    var pairs = [xL, xR];
-    if(o.tip==='vrata'){ pairs.push(r2(xL-0.001)); pairs.push(r2(xR+0.001)); }
-    for(var j=0;j<pairs.length;j++){
-      var px = Math.max(0, Math.min(duzina, pairs[j]));
-      var k = Math.round(px*1000);
-      map[k] = { x_m: r2(px), type:'reinforcement' };
+    var xL = r2(Math.max(0, o.x_m));
+    var xR = r2(Math.min(duzina, o.x_m + o.sirina_m));
+    var t  = o.tip === 'vrata' ? 'ua' : 'reinforcement';
+    map[Math.round(xL*1000)] = { x_m: xL, type: t };
+    map[Math.round(xR*1000)] = { x_m: xR, type: t };
+  }
+
+  // Vrata: ukloni raster stupe unutar otvora, dodaj 2 kratka CW iznad praga
+  for(var i=0;i<S.otvori.length;i++){
+    var o = S.otvori[i];
+    if(o.tip !== 'vrata') continue;
+    for(var k in map){
+      if(map[k].type==='basic' && map[k].x_m > o.x_m+0.001 && map[k].x_m < o.x_m+o.sirina_m-0.001)
+        delete map[k];
     }
+    var xa = r2(o.x_m + o.sirina_m/3);
+    var xb = r2(o.x_m + o.sirina_m*2/3);
+    map[Math.round(xa*1000)] = { x_m: xa, type:'door_stub', stubBot: o.visina_m };
+    map[Math.round(xb*1000)] = { x_m: xb, type:'door_stub', stubBot: o.visina_m };
   }
 
   // Uvijek stup na desnom rubu zida
@@ -286,21 +418,23 @@ function calcCWPositions(){
 
 // ── PROFILE SVG ──────────────────────────────────────────────
 function drawProfili(){
-  var duzina = S.duzina_m, visina = S.visina_m;
+  var duzina = S.duzina_m;
+  var visinL = S.oblik==='trapez' ? S.visina_L_m : S.visina_m;
+  var visinR = S.oblik==='trapez' ? S.visina_D_m : S.visina_m;
+  var visina = Math.max(visinL, visinR);
   var SVG_W=820, PL=8, PR=8, PT=24, PB=24;
   var scale = (SVG_W-PL-PR) / duzina;
   var wallH = visina * scale;
   var SVG_H = wallH + PT + PB;
 
-  var UW_T = Math.max(8, 0.038*scale);   // UW visual thickness px
-  var CW_W = Math.max(5, 0.048*scale);   // CW visual width px
+  var UW_T = Math.max(8, 0.038*scale);
+  var CW_W = Math.max(5, 0.048*scale);
 
   function Xs(m){ return PL + m*scale; }
-  function Ys(m){ return PT + (visina-m)*scale; }  // m=0 → bottom of wall
+  function Ys(m){ return PT + (visina-m)*scale; }
 
   var cwPos = calcCWPositions();
 
-  // Collect door ranges for bottom UW gap
   var doorRanges = [];
   for(var i=0;i<S.otvori.length;i++){
     var o=S.otvori[i];
@@ -309,8 +443,13 @@ function drawProfili(){
 
   var s = '<svg width="100%" viewBox="0 0 '+SVG_W+' '+SVG_H+'" xmlns="http://www.w3.org/2000/svg" id="svg-profili" style="display:block;cursor:default">';
 
-  // Wall fill
-  s += rect(Xs(0), Ys(visina), duzina*scale, wallH, '#ede9e0', 'none', 0);
+  // Wall fill — polygon for trapez, rect for pravokutan
+  if(S.oblik==='trapez'){
+    var wPts=r2(Xs(0))+','+r2(Ys(0))+' '+r2(Xs(duzina))+','+r2(Ys(0))+' '+r2(Xs(duzina))+','+r2(Ys(visinR))+' '+r2(Xs(0))+','+r2(Ys(visinL));
+    s += '<polygon points="'+wPts+'" fill="#ede9e0"/>';
+  } else {
+    s += rect(Xs(0), Ys(visina), duzina*scale, wallH, '#ede9e0', 'none', 0);
+  }
 
   // UW bottom — skip door gaps
   var uwSegs = uwSegments(duzina, doorRanges);
@@ -318,27 +457,45 @@ function drawProfili(){
     var seg=uwSegs[i];
     s += rect(Xs(seg.x1), Ys(0)-UW_T/2, (seg.x2-seg.x1)*scale, UW_T, '#546e7a', 'none', 0, 1);
   }
-  // UW top — full width
-  s += rect(Xs(0), Ys(visina)-UW_T/2, duzina*scale, UW_T, '#546e7a', 'none', 0, 1);
+  // UW top — kosa za trapez
+  if(S.oblik==='trapez'){
+    s += '<line x1="'+r2(Xs(0))+'" y1="'+r2(Ys(visinL))+'" x2="'+r2(Xs(duzina))+'" y2="'+r2(Ys(visinR))+'" stroke="#546e7a" stroke-width="'+r2(UW_T)+'" stroke-linecap="square"/>';
+  } else {
+    s += rect(Xs(0), Ys(visina)-UW_T/2, duzina*scale, UW_T, '#546e7a', 'none', 0, 1);
+  }
 
-  // CW studs
+  // CW / UA studs
   for(var i=0;i<cwPos.length;i++){
     var p = cwPos[i];
     if(p.x_m < -0.001 || p.x_m > duzina+0.001) continue;
-    var fill = p.type==='reinforcement' ? '#e67e22' : '#185fa5';
 
-    // Check if inside door interior (basic studs inside doors are hidden)
-    var inDoorInterior = false;
-    for(var j=0;j<S.otvori.length;j++){
-      var o=S.otvori[j];
-      if(o.tip==='vrata' && p.x_m > o.x_m+0.001 && p.x_m < o.x_m+o.sirina_m-0.001){
-        inDoorInterior = true; break;
-      }
+    // Kratki CW iznad vrata (door_stub)
+    if(p.type==='door_stub'){
+      var stubTop = wallTopAt(p.x_m) - 0.01;
+      var h = (stubTop - p.stubBot) * scale;
+      if(h > 1) s += rect(Xs(p.x_m)-CW_W/2, Ys(stubTop), CW_W, h, '#185fa5', 'none', 0, 1);
+      continue;
     }
-    if(inDoorInterior && p.type==='basic') continue;
 
-    var studH = (visina-0.01)*scale;
-    s += rect(Xs(p.x_m)-CW_W/2, Ys(visina-0.01), CW_W, studH, fill, 'none', 0, 1);
+    // UA profil — ide od poda do visine vrata (ne do stropa)
+    if(p.type==='ua'){
+      var doorH = 0;
+      for(var j=0;j<S.otvori.length;j++){
+        var ov=S.otvori[j];
+        if(ov.tip==='vrata' && (Math.abs(p.x_m-ov.x_m)<0.02 || Math.abs(p.x_m-(ov.x_m+ov.sirina_m))<0.02)){
+          doorH = ov.visina_m; break;
+        }
+      }
+      var uaTop = doorH > 0 ? doorH : (wallTopAt(p.x_m)-0.01);
+      var h = (uaTop - 0.01) * scale;
+      if(h > 1) s += rect(Xs(p.x_m)-CW_W/2, Ys(uaTop), CW_W, h, '#b71c1c', 'none', 0, 1);
+      continue;
+    }
+
+    // Basic / reinforcement — puna visina
+    var fill = p.type==='reinforcement' ? '#e67e22' : '#185fa5';
+    var studTop = wallTopAt(p.x_m) - 0.01;
+    s += rect(Xs(p.x_m)-CW_W/2, Ys(studTop), CW_W, studTop*scale, fill, 'none', 0, 1);
   }
 
   // Threshold UW above (and below for windows) openings
@@ -347,9 +504,7 @@ function drawProfili(){
     if(o.x_m+o.sirina_m > duzina+0.001) continue;
     var pLen = o.sirina_m+0.20;
     var pX   = Math.max(0, o.x_m-0.10);
-    // Header
     s += rect(Xs(pX), Ys(o.visina_m+(o.tip==='prozor'?o.sill_m:0))-UW_T/2, pLen*scale, UW_T, '#78909c', 'none', 0, 0.9);
-    // Sill (windows only)
     if(o.tip==='prozor'){
       s += rect(Xs(pX), Ys(o.sill_m)-UW_T/2, pLen*scale, UW_T, '#78909c', 'none', 0, 0.9);
     }
@@ -369,18 +524,25 @@ function drawProfili(){
     s += '<rect x="'+r2(Xs(ox))+'" y="'+r2(oy)+'" width="'+r2(ow)+'" height="'+r2(oh)+
          '" fill="'+col+'" fill-opacity="0.22" stroke="'+col+'" stroke-width="2.5" rx="2"'+
          ' data-id="'+o.id+'" style="cursor:grab"/>';
-    // Label
     s += '<text x="'+r2(Xs(ox)+ow/2)+'" y="'+r2(oy+oh/2+4)+'" text-anchor="middle" font-size="12" font-weight="700" fill="'+col+'">'+
          (o.tip==='vrata'?'V':'P')+' '+r2(o.sirina_m)+'&#215;'+r2(o.visina_m)+'</text>';
   }
 
   // Wall outline
-  s += rect(Xs(0), Ys(visina), duzina*scale, wallH, 'none', '#2c2c2a', 2);
+  if(S.oblik==='trapez'){
+    var wPtsO=r2(Xs(0))+','+r2(Ys(0))+' '+r2(Xs(duzina))+','+r2(Ys(0))+' '+r2(Xs(duzina))+','+r2(Ys(visinR))+' '+r2(Xs(0))+','+r2(Ys(visinL));
+    s += '<polygon points="'+wPtsO+'" fill="none" stroke="#2c2c2a" stroke-width="2"/>';
+  } else {
+    s += rect(Xs(0), Ys(visina), duzina*scale, wallH, 'none', '#2c2c2a', 2);
+  }
 
   // Dimension text
   var raster = calcRaster();
+  var dimTxt = S.oblik==='trapez'
+    ? Math.round(S.duzina_m*100)+' cm &#215; '+Math.round(visinL*100)+'/'+Math.round(visinR*100)+' cm'
+    : Math.round(S.duzina_m*100)+' cm &#215; '+Math.round(S.visina_m*100)+' cm';
   s += '<text x="'+SVG_W/2+'" y="'+(SVG_H-6)+'" text-anchor="middle" font-size="11" fill="#6b6a64">'+
-       Math.round(S.duzina_m*100)+' cm &#215; '+Math.round(S.visina_m*100)+' cm &nbsp;&nbsp;|&nbsp;&nbsp; CW razmak: '+(raster*100).toFixed(1)+' cm</text>';
+       dimTxt+' &nbsp;&nbsp;|&nbsp;&nbsp; CW razmak: '+(raster*100).toFixed(1)+' cm</text>';
 
   s += '</svg>';
   $i('profili-svg-wrap').innerHTML = s;
@@ -396,6 +558,7 @@ function drawProfili(){
   var leg = '<div class="legend-item"><span class="legend-box" style="background:#546e7a"></span>UW tračnica</div>' +
     '<div class="legend-item"><span class="legend-box" style="background:#185fa5"></span>CW (razmak)</div>' +
     '<div class="legend-item"><span class="legend-box" style="background:#e67e22"></span>CW pojačanje</div>' +
+    '<div class="legend-item"><span class="legend-box" style="background:#b71c1c"></span>UA (okvir vrata)</div>' +
     '<div class="legend-item"><span class="legend-box" style="background:#78909c;opacity:.7"></span>Prag</div>';
   for(var i=0;i<S.otvori.length;i++){
     leg += '<div class="legend-item"><span class="legend-box" style="background:'+otvorColor(i)+';opacity:.5"></span>'+
@@ -481,7 +644,8 @@ document.addEventListener('touchend',  onUp);
 
 // ── PROFILE CALC TABLE ───────────────────────────────────────
 function calcAndShowProfili(){
-  var duzina=S.duzina_m, visina=S.visina_m;
+  var duzina=S.duzina_m;
+  var visina = S.oblik==='trapez' ? r2((S.visina_L_m+S.visina_D_m)/2) : S.visina_m;
   var tip=S.tip_profila, durProf=S.duzina_profila_m;
 
   // UW pod+strop
@@ -496,14 +660,17 @@ function calcAndShowProfili(){
   var uwTotal = uwBase+pragovi;
   var nUW = Math.ceil(uwTotal*1.10/durProf);
 
-  // CW
+  // CW + UA
   var cwPos = calcCWPositions();
-  var nBasic=0, nReinf=0;
+  var nBasic=0, nReinf=0, nUA=0, nStub=0;
   for(var i=0;i<cwPos.length;i++){
-    if(cwPos[i].type==='basic') nBasic++; else nReinf++;
+    if(cwPos[i].type==='basic')       nBasic++;
+    else if(cwPos[i].type==='reinforcement') nReinf++;
+    else if(cwPos[i].type==='ua')     nUA++;
+    else if(cwPos[i].type==='door_stub') nStub++;
   }
   var dCW = r2(visina-0.01);
-  var nCW = Math.ceil((nBasic+nReinf)*1.10);
+  var nCW = Math.ceil((nBasic+nReinf+nStub)*1.10);
 
   // Pričvrsna roba
   var area = duzina*visina*2;
@@ -527,15 +694,18 @@ function calcAndShowProfili(){
   else wb.style.display='none';
 
   var uwTip = tip.replace('CW','UW');
+  var uaTip = tip.replace('CW','UA');
   var rows=[
     ['UW profil ('+uwTip+')', nUW, 'kom ('+durProf+' m)', false],
     ['CW profil ('+tip+')', nCW, 'kom ('+Math.round(dCW*100)+' cm svaki)', false],
     ['&#8212; od toga raster', nBasic, 'kom', true],
-    ['&#8212; od toga poja&#269;anja otvora', nReinf, 'kom', true],
-    ['Vijci TN', vijci, 'kom', false],
-    ['Pri&#269;vr&#353;&#263;enja UW (pod/strop)', pricvr, 'kom', false],
-    ['Brtvena traka', traka.toFixed(2), 'm', false]
+    ['&#8212; od toga poja&#269;anja prozora', nReinf, 'kom', true],
+    ['&#8212; od toga kratki iznad vrata', nStub, 'kom', true],
   ];
+  if(nUA>0) rows.push(['UA profil ('+uaTip+') — okvir vrata', nUA, 'kom', false]);
+  rows.push(['Vijci TN', vijci, 'kom', false]);
+  rows.push(['Pri&#269;vr&#353;&#263;enja UW (pod/strop)', pricvr, 'kom', false]);
+  rows.push(['Brtvena traka', traka.toFixed(2), 'm', false]);
   var html='';
   for(var i=0;i<rows.length;i++){
     var r=rows[i];
@@ -643,6 +813,9 @@ function calcOptimizacija(){
     }
   }
 
+  // Zid ima dvije strane — udvostručimo potrebe za drugu stranu
+  needs = needs.concat(needs.slice(0));
+
   // Sort largest first (best-fit decreasing)
   needs.sort(function(a,b){return b-a;});
 
@@ -703,14 +876,16 @@ function cardHtml(lbl,val,unit){
 // ── MAIN ─────────────────────────────────────────────────────
 function render(){
   readInputs();
+  drawDimSketch();
   drawProfili();
   calcAndShowProfili();
   renderPloce();
 }
 
-var _ids=['i-duzina','i-visina','i-tip','i-oblaganje','i-durprof','i-vispl','i-razmak'];
+var _ids=['i-duzina','i-visina','i-visina-L','i-visina-D','i-tip','i-oblaganje','i-durprof','i-vispl','i-razmak'];
 for(var _ii=0;_ii<_ids.length;_ii++){
   (function(el){
+    if(!el) return;
     el.addEventListener('change', render);
     if(el.tagName==='INPUT') el.addEventListener('input', render);
   })($i(_ids[_ii]));
