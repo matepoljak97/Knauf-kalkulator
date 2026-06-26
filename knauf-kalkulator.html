@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<!-- saved from url=(0059)file:///C:/Users/mpoljak/Downloads/Raspored-gips-ploca.html -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<title>Raspored gips ploča</title>
+</head><body><hta:application id="app" applicationname="RasporedGipsPloca" border="thin" borderstyle="normal" caption="yes" maximizebutton="yes" minimizebutton="yes" scroll="yes" singleinstance="yes" windowstate="normal">
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Tahoma, sans-serif; background: #f4f3ee; color: #2c2c2a; margin: 0; padding: 24px; font-size: 14px; }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; }
+  .sub { color: #6b6a64; margin: 0 0 22px; font-size: 13px; }
+  .inputs { display: flex; flex-wrap: wrap; gap: 16px; background: #fff; border: 1px solid #e3e1d8; border-radius: 10px; padding: 18px; margin-bottom: 22px; }
+  .field { flex: 1 1 140px; }
+  .field label { display: block; font-size: 12px; color: #6b6a64; margin-bottom: 6px; }
+  .field input, .field select { width: 100%; height: 36px; padding: 0 10px; border: 1px solid #cfcdc3; border-radius: 6px; font-size: 14px; background: #fff; color: #2c2c2a; }
+  .field input:focus, .field select:focus { outline: none; border-color: #185fa5; }
+  .layer-title { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
+  .layer-note { font-weight: 400; color: #6b6a64; font-size: 13px; }
+  .panel { background: #fff; border: 1px solid #e3e1d8; border-radius: 10px; padding: 14px; margin-bottom: 22px; overflow-x: auto; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12px; color: #6b6a64; margin-bottom: 22px; }
+  .sw { display: inline-block; width: 12px; height: 12px; vertical-align: -1px; margin-right: 5px; }
+  .cards { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 22px; }
+  .card { flex: 1 1 130px; background: #fff; border: 1px solid #e3e1d8; border-radius: 8px; padding: 14px; }
+  .card .lbl { font-size: 12px; color: #6b6a64; margin-bottom: 4px; }
+  .card .val { font-size: 24px; font-weight: 600; }
+  .card .unit { font-size: 13px; color: #6b6a64; font-weight: 400; }
+  .tips { background: #fef7e8; border: 1px solid #f0d99a; border-radius: 10px; padding: 18px; line-height: 1.7; }
+  .tips h3 { margin: 0 0 10px; font-size: 15px; font-weight: 600; color: #7a5a08; }
+  .tips ul { margin: 0; padding-left: 18px; }
+  .tips li { margin-bottom: 8px; }
+  .foot { text-align: center; color: #9a988f; font-size: 12px; margin-top: 16px; }
+</style>
+
+
+<div class="wrap">
+  <h1>Raspored gips ploča — prvi i drugi sloj</h1>
+  <p class="sub">Upiši dimenzije zida. Program nacrta gdje pada svaka ploča i pomakne fuge drugog sloja.</p>
+
+  <div class="inputs">
+    <div class="field"><label>Širina zida (cm)</label><input type="number" id="w" value="280" min="50" max="800" step="1"></div>
+    <div class="field"><label>Visina zida (cm)</label><input type="number" id="h" value="275" min="50" max="450" step="1"></div>
+    <div class="field"><label>Visina ploče (cm)</label>
+      <select id="ph"><option value="200" selected="">200</option><option value="250">250</option><option value="300">300</option></select>
+    </div>
+    <div class="field"><label>Obloga</label>
+      <select id="layers"><option value="1">Jednostruka</option><option value="2" selected="">Dvostruka</option></select>
+    </div>
+  </div>
+
+  <div class="cards" id="cards"><div class="card"><div class="lbl">CW profili</div><div class="val">6 <span class="unit">kom</span></div></div><div class="card"><div class="lbl">Gips ploče</div><div class="val">7 <span class="unit">kom</span></div></div><div class="card"><div class="lbl">UW profil</div><div class="val">5.6 <span class="unit">m</span></div></div><div class="card"><div class="lbl">Mineralna vuna</div><div class="val">7.7 <span class="unit">m²</span></div></div></div>
+
+  <p class="layer-title">Prvi sloj</p>
+  <div class="panel" id="layer1"><svg width="100%" viewBox="0 0 820 823.6428571428571" xmlns="http://www.w3.org/2000/svg" style="max-width:820px"><rect x="8" y="223.35714285714286" width="358.92857142857144" height="574.2857142857143" fill="#b5d4f4" stroke="#185fa5" stroke-width="1"></rect><text x="187.46428571428572" y="514.5" text-anchor="middle" font-size="11" fill="#0c447c">125×200</text><rect x="8" y="8" width="358.92857142857144" height="215.35714285714286" fill="#fac775" stroke="#ba7517" stroke-width="1"></rect><text x="187.46428571428572" y="119.67857142857143" text-anchor="middle" font-size="11" fill="#633806">125×75</text><rect x="366.92857142857144" y="582.2857142857143" width="358.92857142857144" height="215.35714285714286" fill="#fac775" stroke="#ba7517" stroke-width="1"></rect><text x="546.3928571428571" y="693.9642857142858" text-anchor="middle" font-size="11" fill="#633806">125×75</text><rect x="366.92857142857144" y="8" width="358.92857142857144" height="574.2857142857143" fill="#b5d4f4" stroke="#185fa5" stroke-width="1"></rect><text x="546.3928571428571" y="299.14285714285717" text-anchor="middle" font-size="11" fill="#0c447c">125×200</text><rect x="725.8571428571429" y="223.35714285714286" width="86.14285714285714" height="574.2857142857143" fill="#b5d4f4" stroke="#185fa5" stroke-width="1"></rect><text x="768.9285714285714" y="514.5" text-anchor="middle" font-size="11" fill="#0c447c">30×200</text><rect x="725.8571428571429" y="8" width="86.14285714285714" height="215.35714285714286" fill="#fac775" stroke="#ba7517" stroke-width="1"></rect><text x="768.9285714285714" y="119.67857142857143" text-anchor="middle" font-size="11" fill="#633806">30×75</text><line x1="8" y1="8" x2="8" y2="797.6428571428571" stroke="#5f5e5a" stroke-width="2" stroke-dasharray="3 3" opacity="0.55"></line><line x1="187.46428571428572" y1="8" x2="187.46428571428572" y2="797.6428571428571" stroke="#5f5e5a" stroke-width="2" stroke-dasharray="3 3" opacity="0.55"></line><line x1="366.92857142857144" y1="8" x2="366.92857142857144" y2="797.6428571428571" stroke="#5f5e5a" stroke-width="2" stroke-dasharray="3 3" opacity="0.55"></line><line x1="546.3928571428571" y1="8" x2="546.3928571428571" y2="797.6428571428571" stroke="#5f5e5a" stroke-width="2" stroke-dasharray="3 3" opacity="0.55"></line><line x1="725.8571428571429" y1="8" x2="725.8571428571429" y2="797.6428571428571" stroke="#5f5e5a" stroke-width="2" stroke-dasharray="3 3" opacity="0.55"></line><line x1="812" y1="8" x2="812" y2="797.6428571428571" stroke="#5f5e5a" stroke-width="2" stroke-dasharray="3 3" opacity="0.55"></line><rect x="8" y="8" width="804" height="789.6428571428571" fill="none" stroke="#2c2c2a" stroke-width="1.5"></rect><text x="410" y="815.6428571428571" text-anchor="middle" font-size="11" fill="#6b6a64">širina 280 cm · visina 275 cm</text></svg></div>
+
+  <div id="layer2block" style="display: none;">
+    <p class="layer-title">Drugi sloj <span class="layer-note">— fuge pomaknute za pola ploče (62,5 cm)</span></p>
+    <div class="panel" id="layer2"><svg width="100%" viewBox="0 0 820 823.6428571428571" xmlns="http://www.w3.org/2000/svg" style="max-width:820px"><rect x="8" y="223.35714285714286" width="179.46428571428572" height="574.2857142857143" fill="#b5d4f4" stroke="#185fa5" stroke-width="1"></rect><text x="97.73214285714286" y="514.5" text-anchor="middle" font-size="11" fill="#0c447c">63×200</text><rect x="8" y="8" width="179.46428571428572" height="215.35714285714286" fill="#fac775" stroke="#ba7517" stroke-width="1"></rect><text x="97.73214285714286" y="119.67857142857143" text-anchor="middle" font-size="11" fill="#633806">63×75</text><rect x="187.46428571428572" y="582.2857142857143" width="358.92857142857144" height="215.35714285714286" fill="#fac775" stroke="#ba7517" stroke-width="1"></rect><text x="366.92857142857144" y="693.9642857142858" text-anchor="middle" font-size="11" fill="#633806">125×75</text><rect x="187.46428571428572" y="8" width="358.92857142857144" height="574.2857142857143" fill="#b5d4f4" stroke="#185fa5" stroke-width="1"></rect><text x="366.92857142857144" y="299.14285714285717" text-anchor="middle" font-size="11" fill="#0c447c">125×200</text><rect x="546.3928571428571" y="223.35714285714286" width="265.60714285714283" height="574.2857142857143" fill="#b5d4f4" stroke="#185fa5" stroke-width="1"></rect><text x="679.1964285714286" y="514.5" text-anchor="middle" font-size="11" fill="#0c447c">93×200</text><rect x="546.3928571428571" y="8" width="265.60714285714283" height="215.35714285714286" fill="#fac775" stroke="#ba7517" stroke-width="1"></rect><text x="679.1964285714286" y="119.67857142857143" text-anchor="middle" font-size="11" fill="#633806">93×75</text><line x1="8" y1="8" x2="8" y2="797.6428571428571" stroke="#5f5e5a" stroke-width="2" stroke-dasharray="3 3" opacity="0.55"></line><line x1="187.46428571428572" y1="8" x2="187.46428571428572" y2="797.6428571428571" stroke="#5f5e5a" stroke-width="2" stroke-dasharray="3 3" opacity="0.55"></line><line x1="366.92857142857144" y1="8" x2="366.92857142857144" y2="797.6428571428571" stroke="#5f5e5a" stroke-width="2" stroke-dasharray="3 3" opacity="0.55"></line><line x1="546.3928571428571" y1="8" x2="546.3928571428571" y2="797.6428571428571" stroke="#5f5e5a" stroke-width="2" stroke-dasharray="3 3" opacity="0.55"></line><line x1="725.8571428571429" y1="8" x2="725.8571428571429" y2="797.6428571428571" stroke="#5f5e5a" stroke-width="2" stroke-dasharray="3 3" opacity="0.55"></line><line x1="812" y1="8" x2="812" y2="797.6428571428571" stroke="#5f5e5a" stroke-width="2" stroke-dasharray="3 3" opacity="0.55"></line><rect x="8" y="8" width="804" height="789.6428571428571" fill="none" stroke="#2c2c2a" stroke-width="1.5"></rect><text x="410" y="815.6428571428571" text-anchor="middle" font-size="11" fill="#6b6a64">širina 280 cm · visina 275 cm</text></svg></div>
+  </div>
+
+  <div class="legend">
+    <span><span class="sw" style="background:#b5d4f4;border:1px solid #185fa5"></span>cijela ploča</span>
+    <span><span class="sw" style="background:#fac775;border:1px solid #ba7517"></span>rezana ploča</span>
+    <span><span class="sw" style="border-top:2px dashed #5f5e5a;height:0;width:14px;vertical-align:3px"></span>profil (62,5 cm)</span>
+  </div>
+
+  <div class="tips">
+    <h3>Pravila za slaganje</h3>
+    <ul>
+      <li><strong>Vertikalne fuge:</strong> uvijek padaju na profil. U prvom sloju na 0 / 125 / 250 cm, u drugom pomaknute za 62,5 cm — tako se ne poklapaju.</li>
+      <li><strong>Vodoravne fuge:</strong> u susjednim stupcima naizmjenično gore/dolje (kao cigle), nikad sve u istoj liniji.</li>
+      <li><strong>Drugi sloj nikad ne smije imati fugu nad fugom prvog sloja</strong> — ni vertikalnu ni vodoravnu.</li>
+      <li><strong>Rezani rub u spoju:</strong> faziraj ga nožem prije gletanja. Rub uz kut/zid: odreži utanjeni dio (~5 cm).</li>
+      <li><strong>Razmak vijaka</strong> oko 25 cm, držati ploče od stropa prema dolje.</li>
+    </ul>
+  </div>
+
+  <p class="foot">Mjere ploča na crtežu su širina×visina u cm. Brojke uključuju 10% rezerve za rezanje.</p>
+</div>
+
+<script type="text/javascript">
+function $(id){ return document.getElementById(id); }
+var PW = 125, SPACING = 62.5;
+
+function columns(W, offset){
+  var cols = [], x = 0;
+  if (offset > 0){ cols.push({x:0, w:Math.min(offset, W)}); x = offset; }
+  while (x < W - 0.01){ cols.push({x:x, w:Math.min(PW, W - x)}); x += PW; }
+  return cols;
+}
+function rowsFor(H, PH, colIndex){
+  if (H <= PH) return [{y:0, h:H, cut:false}];
+  if (H <= 2*PH){
+    var rem = Math.round((H-PH)*10)/10;
+    return colIndex % 2 === 0
+      ? [{y:0,h:PH,cut:false},{y:PH,h:rem,cut:true}]
+      : [{y:0,h:rem,cut:true},{y:rem,h:PH,cut:false}];
+  }
+  var r = [], y = 0, off = (colIndex%2===1) ? Math.round(PH/2) : 0;
+  if (off > 0){ r.push({y:0,h:off,cut:true}); y = off; }
+  while (y < H - 0.01){ var h = Math.min(PH, H-y); r.push({y:y,h:Math.round(h*10)/10,cut:h<PH}); y += PH; }
+  return r;
+}
+
+function draw(elId, W, H, PH, offset){
+  var maxW = 820, padL = 8, padR = 8, padT = 8, padB = 26;
+  var scale = (maxW - padL - padR) / W;
+  var ph_px = H * scale, vbW = maxW, vbH = ph_px + padT + padB;
+  var cols = columns(W, offset);
+  function X(cm){ return padL + cm*scale; }
+  function Y(cm){ return padT + (H - cm)*scale; }
+  var s = '<svg width="100%" viewBox="0 0 '+vbW+' '+vbH+'" xmlns="http://www.w3.org/2000/svg" style="max-width:'+maxW+'px">';
+  for (var c=0;c<cols.length;c++){
+    var col = cols[c], rws = rowsFor(H, PH, c);
+    for (var r=0;r<rws.length;r++){
+      var rw = rws[r];
+      var px = X(col.x), py = Y(rw.y+rw.h), pw = col.w*scale, pHt = rw.h*scale;
+      var fill = rw.cut ? '#fac775' : '#b5d4f4';
+      var stroke = rw.cut ? '#ba7517' : '#185fa5';
+      s += '<rect x="'+px+'" y="'+py+'" width="'+pw+'" height="'+pHt+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="1"/>';
+      if (pw > 36 && pHt > 16){
+        var label = Math.round(col.w)+'&#215;'+Math.round(rw.h);
+        s += '<text x="'+(px+pw/2)+'" y="'+(py+pHt/2+4)+'" text-anchor="middle" font-size="11" fill="'+(rw.cut?'#633806':'#0c447c')+'">'+label+'</text>';
+      }
+    }
+  }
+  var gaps = Math.ceil(W/SPACING);
+  for (var i=0;i<=gaps;i++){
+    var posCm = (i===gaps) ? W : Math.min(i*SPACING, W);
+    var lx = X(posCm);
+    s += '<line x1="'+lx+'" y1="'+padT+'" x2="'+lx+'" y2="'+(padT+ph_px)+'" stroke="#5f5e5a" stroke-width="2" stroke-dasharray="3 3" opacity="0.55"/>';
+  }
+  s += '<rect x="'+X(0)+'" y="'+padT+'" width="'+(W*scale)+'" height="'+ph_px+'" fill="none" stroke="#2c2c2a" stroke-width="1.5"/>';
+  s += '<text x="'+(vbW/2)+'" y="'+(vbH-8)+'" text-anchor="middle" font-size="11" fill="#6b6a64">širina '+W+' cm &#183; visina '+H+' cm</text>';
+  s += '</svg>';
+  $(elId).innerHTML = s;
+}
+
+function cardHtml(lbl, val, unit){
+  return '<div class="card"><div class="lbl">'+lbl+'</div><div class="val">'+val+' <span class="unit">'+unit+'</span></div></div>';
+}
+
+function render(){
+  var W = Math.max(50, parseFloat($('w').value)||0);
+  var H = Math.max(50, parseFloat($('h').value)||0);
+  var PH = parseFloat($('ph').value);
+  var layers = parseInt($('layers').value, 10);
+
+  draw('layer1', W, H, PH, 0);
+  if (layers === 2){ draw('layer2', W, H, PH, SPACING); $('layer2block').style.display='block'; }
+  else { $('layer2block').style.display='none'; }
+
+  var gaps = Math.ceil(W/SPACING);
+  var profiles = gaps + 1;
+  var areaOne = (W/100)*(H/100);
+  var totalArea = areaOne * 2 * layers;
+  var plateArea = (PW/100)*(PH/100);
+  var plates = Math.ceil((totalArea/plateArea)*1.1);
+  var uw = Math.round((W*2)/100*10)/10;
+  var wool = Math.round(areaOne*10)/10;
+
+  $('cards').innerHTML =
+    cardHtml('CW profili', profiles, 'kom') +
+    cardHtml('Gips ploče', plates, 'kom') +
+    cardHtml('UW profil', uw, 'm') +
+    cardHtml('Mineralna vuna', wool, 'm&sup2;');
+}
+
+var ids = ['w','h','ph','layers'];
+for (var i=0;i<ids.length;i++){
+  var el = $(ids[i]);
+  if (el.attachEvent){ el.attachEvent('onchange', render); el.attachEvent('onkeyup', render); }
+  else { el.addEventListener('change', render); el.addEventListener('keyup', render); }
+}
+render();
+</script>
+
+
+</hta:application></body></html>
