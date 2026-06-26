@@ -477,18 +477,10 @@ function drawProfili(){
       continue;
     }
 
-    // UA profil — ide od poda do visine vrata (ne do stropa)
+    // UA profil — puna visina (pod do strop), kao i CW
     if(p.type==='ua'){
-      var doorH = 0;
-      for(var j=0;j<S.otvori.length;j++){
-        var ov=S.otvori[j];
-        if(ov.tip==='vrata' && (Math.abs(p.x_m-ov.x_m)<0.02 || Math.abs(p.x_m-(ov.x_m+ov.sirina_m))<0.02)){
-          doorH = ov.visina_m; break;
-        }
-      }
-      var uaTop = doorH > 0 ? doorH : (wallTopAt(p.x_m)-0.01);
-      var h = (uaTop - 0.01) * scale;
-      if(h > 1) s += rect(Xs(p.x_m)-CW_W/2, Ys(uaTop), CW_W, h, '#b71c1c', 'none', 0, 1);
+      var uaTop = wallTopAt(p.x_m) - 0.01;
+      s += rect(Xs(p.x_m)-CW_W/2, Ys(uaTop), CW_W, uaTop*scale, '#b71c1c', 'none', 0, 1);
       continue;
     }
 
