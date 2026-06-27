@@ -731,15 +731,27 @@ function plateRows(H, PH, colIdx){
   return arr;
 }
 function drawPloce(elId, W, H, PH, offset){
+  var isTrapez=S.oblik==='trapez';
+  var HL=isTrapez?S.visina_L_m:H, HD=isTrapez?S.visina_D_m:H;
+  var Hmax=isTrapez?Math.max(HL,HD):H;
   var mxW=820,pL=8,pR=8,pT=8,pB=26;
   var sc=(mxW-pL-pR)/W;
-  var vbH=H*sc+pT+pB;
+  var vbH=Hmax*sc+pT+pB;
   var cols=plateCols(W,offset);
   function Xp(m){return pL+m*sc;}
-  function Yp(m){return pT+(H-m)*sc;}
+  function Yp(m){return pT+(Hmax-m)*sc;}
   var s='<svg width="100%" viewBox="0 0 '+mxW+' '+vbH+'" xmlns="http://www.w3.org/2000/svg" style="max-width:'+mxW+'px">';
+  if(isTrapez){
+    var clipId='clip-'+elId;
+    s+='<defs><clipPath id="'+clipId+'">'
+      +'<polygon points="'+r2(Xp(0))+','+r2(Yp(HL))+' '+r2(Xp(W))+','+r2(Yp(HD))+' '+r2(Xp(W))+','+r2(Yp(0))+' '+r2(Xp(0))+','+r2(Yp(0))+'"/>'
+      +'</clipPath></defs>';
+    s+='<g clip-path="url(#'+clipId+')">';
+  }
   for(var c=0;c<cols.length;c++){
-    var col=cols[c], rows=plateRows(H,PH,c);
+    var col=cols[c];
+    var colH=isTrapez?wallTopAt(col.x):H;
+    var rows=plateRows(colH,PH,c);
     for(var ri=0;ri<rows.length;ri++){
       var rw=rows[ri];
       var px=Xp(col.x),py=Yp(rw.y+rw.h),pw=col.w*sc,ph=rw.h*sc;
@@ -751,12 +763,14 @@ function drawPloce(elId, W, H, PH, offset){
       }
     }
   }
+  if(isTrapez) s+='</g>';
   // Profile lines — isti raster kao na prikazu profila
   var rast=calcRaster();
   var n=Math.ceil(W/rast);
   for(var i=0;i<=n;i++){
     var lx=Xp(Math.min(i*rast,W));
-    s+='<line x1="'+r2(lx)+'" y1="'+pT+'" x2="'+r2(lx)+'" y2="'+r2(pT+H*sc)+'" stroke="#5f5e5a" stroke-width="2" stroke-dasharray="3 3" opacity="0.5"/>';
+    var lineTop=isTrapez?r2(Yp(wallTopAt(Math.min(i*rast,W)))):pT;
+    s+='<line x1="'+r2(lx)+'" y1="'+lineTop+'" x2="'+r2(lx)+'" y2="'+r2(Yp(0))+'" stroke="#5f5e5a" stroke-width="2" stroke-dasharray="3 3" opacity="0.5"/>';
   }
   // Otvor masking — prekrij ploče gdje su otvori
   for(var oi=0;oi<S.otvori.length;oi++){
@@ -776,9 +790,13 @@ function drawPloce(elId, W, H, PH, offset){
       if(ow2>24 && oh2>14) s+='<text x="'+r2(parseFloat(ox2)+ow2/2)+'" y="'+r2(parseFloat(oy2)+oh2/2+4)+'" text-anchor="middle" font-size="11" fill="#6b6a64">'+(ov.tip==='vrata'?'VRATA':'PROZOR')+'</text>';
     }
   }
-
-  s+='<rect x="'+Xp(0)+'" y="'+pT+'" width="'+r2(W*sc)+'" height="'+r2(H*sc)+'" fill="none" stroke="#2c2c2a" stroke-width="1.5"/>';
-  s+='<text x="'+mxW/2+'" y="'+(vbH-8)+'" text-anchor="middle" font-size="11" fill="#6b6a64">'+r2(W)+' m &#215; '+r2(H)+' m</text>';
+  if(isTrapez){
+    s+='<polygon points="'+r2(Xp(0))+','+r2(Yp(HL))+' '+r2(Xp(W))+','+r2(Yp(HD))+' '+r2(Xp(W))+','+r2(Yp(0))+' '+r2(Xp(0))+','+r2(Yp(0))+'" fill="none" stroke="#2c2c2a" stroke-width="1.5"/>';
+    s+='<text x="'+mxW/2+'" y="'+(vbH-8)+'" text-anchor="middle" font-size="11" fill="#6b6a64">'+r2(W)+' m | L: '+fmtCm(HL)+' cm, D: '+fmtCm(HD)+' cm</text>';
+  } else {
+    s+='<rect x="'+Xp(0)+'" y="'+pT+'" width="'+r2(W*sc)+'" height="'+r2(H*sc)+'" fill="none" stroke="#2c2c2a" stroke-width="1.5"/>';
+    s+='<text x="'+mxW/2+'" y="'+(vbH-8)+'" text-anchor="middle" font-size="11" fill="#6b6a64">'+r2(W)+' m &#215; '+r2(H)+' m</text>';
+  }
   s+='</svg>';
   $i(elId).innerHTML=s;
 }
@@ -840,7 +858,8 @@ function calcOptimizacija(){
 }
 
 function renderPloce(){
-  var W=S.duzina_m, H=S.visina_m, PH=S.visina_ploce_m;
+  var W=S.duzina_m, PH=S.visina_ploce_m;
+  var H=S.oblik==='trapez'?Math.max(S.visina_L_m,S.visina_D_m):S.visina_m;
   var layers = S.oblaganje==='dvostruko' ? 2 : 1;
   var opt = calcOptimizacija();
 
@@ -868,7 +887,9 @@ function renderPloce(){
 }
 
 function renderRezniPlan(){
-  var W=S.duzina_m, H=S.visina_m, PH=S.visina_ploce_m;
+  var W=S.duzina_m, PH=S.visina_ploce_m;
+  var H=S.oblik==='trapez'?Math.max(S.visina_L_m,S.visina_D_m):S.visina_m;
+  var isTrapez=S.oblik==='trapez';
   var layers=S.oblaganje==='dvostruko'?2:1;
   var offsets=layers===2?[0,SPACING]:[0];
 
@@ -877,7 +898,8 @@ function renderRezniPlan(){
     var cols=plateCols(W,offsets[li]);
     for(var c=0;c<cols.length;c++){
       var col=cols[c];
-      var rows=plateRows(H,PH,c);
+      var colH=isTrapez?wallTopAt(col.x):H;
+      var rows=plateRows(colH,PH,c);
       for(var ri=0;ri<rows.length;ri++){
         var rw=rows[ri];
         var cutW=col.w<PLATE_W-0.005;
