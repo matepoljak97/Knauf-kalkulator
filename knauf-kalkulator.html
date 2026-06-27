@@ -178,6 +178,10 @@ h2 { font-size: 16px; font-weight: 600; margin: 0 0 8px; }
       <div class="legend-item"><span class="legend-box" style="background:#fac775;border:1px solid #ba7517"></span>Rezana ploča</div>
       <div class="legend-item"><span style="border-top:2px dashed #5f5e5a;height:0;width:14px;vertical-align:3px;display:inline-block"></span>&nbsp;Profil</div>
     </div>
+    <div id="rezni-plan-section" style="display:none">
+      <p class="layer-title">Rezni plan <span class="layer-note">— komadi za predrezanje</span></p>
+      <div class="panel" id="rezni-plan-panel"></div>
+    </div>
   </div>
 
   <p class="foot">Knauf kalkulator — mjere u metrima, komadi zaokruženi naviše.</p>
@@ -859,6 +863,77 @@ function renderPloce(){
 
   if(layers===2){ drawPloce('layer2', W, H, PH, SPACING); $i('layer2block').style.display=''; }
   else $i('layer2block').style.display='none';
+
+  renderRezniPlan();
+}
+
+function renderRezniPlan(){
+  var W=S.duzina_m, H=S.visina_m, PH=S.visina_ploce_m;
+  var layers=S.oblaganje==='dvostruko'?2:1;
+  var offsets=layers===2?[0,SPACING]:[0];
+
+  var map={};
+  for(var li=0;li<offsets.length;li++){
+    var cols=plateCols(W,offsets[li]);
+    for(var c=0;c<cols.length;c++){
+      var col=cols[c];
+      var rows=plateRows(H,PH,c);
+      for(var ri=0;ri<rows.length;ri++){
+        var rw=rows[ri];
+        var cutW=col.w<PLATE_W-0.005;
+        var cutH=rw.h<PH-0.005;
+        if(!cutW&&!cutH) continue;
+        var key=fmtCm(col.w)+'x'+fmtCm(rw.h);
+        if(!map[key]) map[key]={w:col.w,h:rw.h,wCm:fmtCm(col.w),hCm:fmtCm(rw.h),count:0,cutW:cutW,cutH:cutH,inLayers:{}};
+        map[key].count++;
+        map[key].inLayers[li+1]=true;
+      }
+    }
+  }
+
+  var arr=[];
+  for(var k in map){ map[k].count*=2; arr.push(map[k]); }
+
+  var el=$i('rezni-plan-section');
+  if(arr.length===0){ el.style.display='none'; return; }
+
+  arr.sort(function(a,b){ return b.w*b.h-a.w*a.h; });
+
+  // Thumbnail: piece (orange) shown within full-plate ghost (grey)
+  var BW=80,BH=60;
+  var sc2=Math.min(BW/PLATE_W,BH/PH)*0.9;
+  var fpW=Math.round(PLATE_W*sc2),fpH=Math.round(PH*sc2);
+  var ox=Math.round((BW-fpW)/2),oy=Math.round((BH-fpH)/2);
+
+  var html='<div style="display:flex;flex-wrap:wrap;gap:10px;padding:4px 0">';
+  for(var i=0;i<arr.length;i++){
+    var p=arr[i];
+    var fw=Math.round(p.w*sc2),fh=Math.round(p.h*sc2);
+    var cutNote=[];
+    if(p.cutW) cutNote.push('š: '+p.wCm+' cm');
+    if(p.cutH) cutNote.push('v: '+p.hCm+' cm');
+    var layerBadge='';
+    if(layers===2){
+      var ls=Object.keys(p.inLayers).sort().join('+');
+      layerBadge='<div style="font-size:11px;color:#9a988f">Sloj '+ls+'</div>';
+    }
+    var svg='<svg width="'+BW+'" height="'+BH+'" style="display:block;margin:0 auto">'
+      +'<rect x="'+ox+'" y="'+oy+'" width="'+fpW+'" height="'+fpH+'" fill="#f0efe8" stroke="#ccc" stroke-width="1" rx="1"/>'
+      +'<rect x="'+ox+'" y="'+oy+'" width="'+fw+'" height="'+fh+'" fill="#fac775" stroke="#ba7517" stroke-width="1.5" rx="1"/>'
+      +'</svg>';
+    html+='<div style="text-align:center;background:#fff;border:1px solid #e0dfd8;border-radius:6px;padding:8px 12px;min-width:110px">'
+      +svg
+      +'<div style="font-size:14px;font-weight:600;margin:5px 0 2px">'+p.wCm+' &#215; '+p.hCm+' cm</div>'
+      +'<div style="font-size:13px;color:#9a988f;font-weight:500">'+p.count+' kom</div>'
+      +layerBadge
+      +'</div>';
+  }
+  html+='</div>';
+  html+='<p style="font-size:12px;color:#9a988f;margin:8px 0 0">* Uključuje obje strane zida'
+    +(layers===2?', oba sloja':'')+'. Bez 10% rezerve za otpad. Oko otvora (vrata/prozori) mogući su L-rezovi.</p>';
+
+  $i('rezni-plan-panel').innerHTML=html;
+  el.style.display='';
 }
 
 function cardHtml(lbl,val,unit){
