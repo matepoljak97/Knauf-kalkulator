@@ -886,30 +886,46 @@ function renderPloce(){
   renderRezniPlan();
 }
 
-function pieceThumbnail(colW, rowH, PH){
-  // Canvas: 130×120 px. Right + bottom padding reserved for dimension labels.
-  var cW=130,cH=120,pL=5,pR=40,pT=5,pB=22;
+function pieceThumbnail(colW, leftH, rightH, PH){
+  // leftH = height at left edge, rightH = height at right edge
+  // If they differ: draw a trapezoid and show 3 dimension lines (width + left H + right H)
+  // If equal: draw a rectangle and show 2 dimension lines (width + height)
+  var isTrapez=Math.abs(leftH-rightH)>0.005;
+  var cW=isTrapez?155:130, cH=120, pL=isTrapez?36:5, pR=40, pT=5, pB=22;
   var sc=Math.min((cW-pL-pR)/PLATE_W,(cH-pT-pB)/PH)*0.95;
-  var fpW=r2(PLATE_W*sc),fpH=r2(PH*sc);
-  var fw=r2(colW*sc),fh=r2(rowH*sc);
-  var px=pL,py=pT;
+  var fpW=r2(PLATE_W*sc), fpH=r2(PH*sc);
+  var fw=r2(colW*sc), fhL=r2(leftH*sc), fhR=r2(rightH*sc);
+  var px=pL, botY=r2(pT+fpH); // piece bottom = bottom of full-plate ghost
+  var tlY=r2(botY-fhL), trY=r2(botY-fhR); // top-left and top-right of piece
   var s='<svg width="'+cW+'" height="'+cH+'" style="display:block;margin:0 auto" xmlns="http://www.w3.org/2000/svg">';
   // full-plate ghost
-  s+='<rect x="'+px+'" y="'+py+'" width="'+fpW+'" height="'+fpH+'" fill="#eeecea" stroke="#ccc" stroke-width="1"/>';
-  // cut piece (top-left aligned)
-  s+='<rect x="'+px+'" y="'+py+'" width="'+fw+'" height="'+fh+'" fill="#fac775" stroke="#ba7517" stroke-width="1.5"/>';
-  // width dimension line (below cut piece)
-  var dlY=r2(py+fh+5);
-  s+='<line x1="'+px+'" y1="'+dlY+'" x2="'+r2(px+fw)+'" y2="'+dlY+'" stroke="#9a988f" stroke-width="1"/>';
-  s+='<line x1="'+px+'" y1="'+r2(dlY-3)+'" x2="'+px+'" y2="'+r2(dlY+3)+'" stroke="#9a988f" stroke-width="1"/>';
-  s+='<line x1="'+r2(px+fw)+'" y1="'+r2(dlY-3)+'" x2="'+r2(px+fw)+'" y2="'+r2(dlY+3)+'" stroke="#9a988f" stroke-width="1"/>';
-  s+='<text x="'+r2(px+fw/2)+'" y="'+r2(dlY+12)+'" text-anchor="middle" font-size="11" font-weight="bold" fill="#633806">'+fmtCm(colW)+' cm</text>';
-  // height dimension line (right of cut piece)
-  var dlX=r2(px+fw+6);
-  s+='<line x1="'+dlX+'" y1="'+py+'" x2="'+dlX+'" y2="'+r2(py+fh)+'" stroke="#9a988f" stroke-width="1"/>';
-  s+='<line x1="'+r2(dlX-3)+'" y1="'+py+'" x2="'+r2(dlX+3)+'" y2="'+py+'" stroke="#9a988f" stroke-width="1"/>';
-  s+='<line x1="'+r2(dlX-3)+'" y1="'+r2(py+fh)+'" x2="'+r2(dlX+3)+'" y2="'+r2(py+fh)+'" stroke="#9a988f" stroke-width="1"/>';
-  s+='<text x="'+r2(dlX+9)+'" y="'+r2(py+fh/2+4)+'" font-size="11" font-weight="bold" fill="#633806">'+fmtCm(rowH)+' cm</text>';
+  s+='<rect x="'+px+'" y="'+pT+'" width="'+fpW+'" height="'+fpH+'" fill="#eeecea" stroke="#ccc" stroke-width="1"/>';
+  // cut piece: trapezoid polygon or simple rectangle
+  if(isTrapez){
+    s+='<polygon points="'+px+','+botY+' '+px+','+tlY+' '+r2(px+fw)+','+trY+' '+r2(px+fw)+','+botY+'" fill="#fac775" stroke="#ba7517" stroke-width="1.5"/>';
+  } else {
+    s+='<rect x="'+px+'" y="'+tlY+'" width="'+fw+'" height="'+fhL+'" fill="#fac775" stroke="#ba7517" stroke-width="1.5"/>';
+  }
+  // width dim line (below piece)
+  var dwY=r2(botY+5);
+  s+='<line x1="'+px+'" y1="'+dwY+'" x2="'+r2(px+fw)+'" y2="'+dwY+'" stroke="#9a988f" stroke-width="1"/>';
+  s+='<line x1="'+px+'" y1="'+r2(dwY-3)+'" x2="'+px+'" y2="'+r2(dwY+3)+'" stroke="#9a988f" stroke-width="1"/>';
+  s+='<line x1="'+r2(px+fw)+'" y1="'+r2(dwY-3)+'" x2="'+r2(px+fw)+'" y2="'+r2(dwY+3)+'" stroke="#9a988f" stroke-width="1"/>';
+  s+='<text x="'+r2(px+fw/2)+'" y="'+r2(dwY+12)+'" text-anchor="middle" font-size="11" font-weight="bold" fill="#633806">'+fmtCm(colW)+' cm</text>';
+  // left height dim line (only for trapezoid, drawn to the left of piece)
+  if(isTrapez){
+    var dlX=r2(px-6);
+    s+='<line x1="'+dlX+'" y1="'+tlY+'" x2="'+dlX+'" y2="'+botY+'" stroke="#9a988f" stroke-width="1"/>';
+    s+='<line x1="'+r2(dlX-3)+'" y1="'+tlY+'" x2="'+r2(dlX+3)+'" y2="'+tlY+'" stroke="#9a988f" stroke-width="1"/>';
+    s+='<line x1="'+r2(dlX-3)+'" y1="'+botY+'" x2="'+r2(dlX+3)+'" y2="'+botY+'" stroke="#9a988f" stroke-width="1"/>';
+    s+='<text x="'+r2(dlX-8)+'" y="'+r2((tlY+botY)/2+4)+'" text-anchor="end" font-size="11" font-weight="bold" fill="#633806">'+fmtCm(leftH)+' cm</text>';
+  }
+  // right height dim line (right of piece — for rectangles this is the only height label)
+  var drX=r2(px+fw+6);
+  s+='<line x1="'+drX+'" y1="'+trY+'" x2="'+drX+'" y2="'+botY+'" stroke="#9a988f" stroke-width="1"/>';
+  s+='<line x1="'+r2(drX-3)+'" y1="'+trY+'" x2="'+r2(drX+3)+'" y2="'+trY+'" stroke="#9a988f" stroke-width="1"/>';
+  s+='<line x1="'+r2(drX-3)+'" y1="'+botY+'" x2="'+r2(drX+3)+'" y2="'+botY+'" stroke="#9a988f" stroke-width="1"/>';
+  s+='<text x="'+r2(drX+9)+'" y="'+r2((trY+botY)/2+4)+'" font-size="11" font-weight="bold" fill="#633806">'+fmtCm(isTrapez?rightH:leftH)+' cm</text>';
   s+='</svg>';
   return s;
 }
@@ -923,19 +939,27 @@ function renderRezniPlan(){
   var el=$i('rezni-plan-section');
 
   if(isTrapez){
-    // Trapezoid: every column has unique top height → cards sorted left→right
+    // Trapezoid: ceiling piece has slanted top → leftH and rightH differ per column
     var rows_t=[];
     for(var li=0;li<offsets.length;li++){
       var cols=plateCols(W,offsets[li]);
       for(var c=0;c<cols.length;c++){
         var col=cols[c];
-        var colH=wallTopAt(col.x);
-        var rws=plateRows(colH,PH,c);
-        for(var ri=0;ri<rws.length;ri++){
+        var hL=wallTopAt(col.x);
+        var hR=wallTopAt(Math.min(col.x+col.w, W));
+        var rws=plateRows(hL,PH,c);
+        var cutW=col.w<PLATE_W-0.005;
+        // Ceiling piece = last row; its top follows the slanted wall
+        var lastRw=rws[rws.length-1];
+        var baseY=lastRw.y;
+        var ceilL=hL-baseY, ceilR=hR-baseY;
+        var needCut=cutW||(ceilL<PH-0.005)||Math.abs(ceilL-ceilR)>0.005;
+        if(needCut) rows_t.push({x:col.x,w:col.w,leftH:ceilL,rightH:ceilR,layer:li+1});
+        // Non-ceiling pieces below (stagger cuts) — always rectangular
+        for(var ri=0;ri<rws.length-1;ri++){
           var rw=rws[ri];
-          var cutW=col.w<PLATE_W-0.005, cutH=rw.h<PH-0.005;
-          if(!cutW&&!cutH) continue;
-          rows_t.push({x:col.x,w:col.w,h:rw.h,cutW:cutW,cutH:cutH,layer:li+1});
+          if((col.w<PLATE_W-0.005)||(rw.h<PH-0.005))
+            rows_t.push({x:col.x,w:col.w,leftH:rw.h,rightH:rw.h,layer:li+1});
         }
       }
     }
@@ -962,10 +986,10 @@ function renderRezniPlan(){
       if(showLayer) meta+='<div style="font-size:11px;color:#9a988f">Sloj '+p.layer+'</div>';
       meta+='<div style="font-size:12px;color:#5f5e5a;font-weight:500">2 kom</div>';
       html+='<div style="text-align:center;background:#fff;border:1px solid #e0dfd8;border-radius:6px;padding:8px 10px">'
-        +pieceThumbnail(p.w,p.h,PH)+meta+'</div>';
+        +pieceThumbnail(p.w,p.leftH,p.rightH,PH)+meta+'</div>';
     }
     html+='</div>';
-    html+='<p style="font-size:12px;color:#9a988f;margin:8px 0 0">* 2 kom = obje strane zida'+(showLayer?', po svakom sloju':'')+'. Visinski rez prati nagib stropa — preporuča se mjerenje na licu mjesta.</p>';
+    html+='<p style="font-size:12px;color:#9a988f;margin:8px 0 0">* 2 kom = obje strane zida'+(showLayer?', po svakom sloju':'')+'. Nagib gornjeg brida prati strop — preporuča se mjerenje na licu mjesta.</p>';
     $i('rezni-plan-panel').innerHTML=html;
     el.style.display='';
     return;
@@ -1003,7 +1027,7 @@ function renderRezniPlan(){
       layerBadge='<div style="font-size:11px;color:#9a988f">Sloj '+ls+'</div>';
     }
     html+='<div style="text-align:center;background:#fff;border:1px solid #e0dfd8;border-radius:6px;padding:8px 10px">'
-      +pieceThumbnail(p.w,p.h,PH)
+      +pieceThumbnail(p.w,p.h,p.h,PH)
       +layerBadge
       +'<div style="font-size:12px;color:#5f5e5a;font-weight:500;margin-top:4px">'+p.count+' kom</div>'
       +'</div>';
