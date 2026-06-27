@@ -887,20 +887,19 @@ function renderPloce(){
 }
 
 function pieceThumbnail(colW, leftH, rightH, PH){
-  // leftH = height at left edge, rightH = height at right edge
-  // If they differ: draw a trapezoid and show 3 dimension lines (width + left H + right H)
-  // If equal: draw a rectangle and show 2 dimension lines (width + height)
+  // Height labels use rotate(-90°) text so they take ~10 px horizontally
+  // regardless of text length — no left/right overflow possible.
   var isTrapez=Math.abs(leftH-rightH)>0.005;
-  var cW=isTrapez?155:130, cH=120, pL=isTrapez?36:5, pR=40, pT=5, pB=22;
+  var cW=150,cH=120,pL=25,pR=25,pT=5,pB=22;
   var sc=Math.min((cW-pL-pR)/PLATE_W,(cH-pT-pB)/PH)*0.95;
-  var fpW=r2(PLATE_W*sc), fpH=r2(PH*sc);
-  var fw=r2(colW*sc), fhL=r2(leftH*sc), fhR=r2(rightH*sc);
-  var px=pL, botY=r2(pT+fpH); // piece bottom = bottom of full-plate ghost
-  var tlY=r2(botY-fhL), trY=r2(botY-fhR); // top-left and top-right of piece
+  var fpW=r2(PLATE_W*sc),fpH=r2(PH*sc);
+  var fw=r2(colW*sc),fhL=r2(leftH*sc),fhR=r2(rightH*sc);
+  var px=pL,botY=r2(pT+fpH);
+  var tlY=r2(botY-fhL),trY=r2(botY-fhR);
   var s='<svg width="'+cW+'" height="'+cH+'" style="display:block;margin:0 auto" xmlns="http://www.w3.org/2000/svg">';
   // full-plate ghost
   s+='<rect x="'+px+'" y="'+pT+'" width="'+fpW+'" height="'+fpH+'" fill="#eeecea" stroke="#ccc" stroke-width="1"/>';
-  // cut piece: trapezoid polygon or simple rectangle
+  // cut piece
   if(isTrapez){
     s+='<polygon points="'+px+','+botY+' '+px+','+tlY+' '+r2(px+fw)+','+trY+' '+r2(px+fw)+','+botY+'" fill="#fac775" stroke="#ba7517" stroke-width="1.5"/>';
   } else {
@@ -912,20 +911,26 @@ function pieceThumbnail(colW, leftH, rightH, PH){
   s+='<line x1="'+px+'" y1="'+r2(dwY-3)+'" x2="'+px+'" y2="'+r2(dwY+3)+'" stroke="#9a988f" stroke-width="1"/>';
   s+='<line x1="'+r2(px+fw)+'" y1="'+r2(dwY-3)+'" x2="'+r2(px+fw)+'" y2="'+r2(dwY+3)+'" stroke="#9a988f" stroke-width="1"/>';
   s+='<text x="'+r2(px+fw/2)+'" y="'+r2(dwY+12)+'" text-anchor="middle" font-size="11" font-weight="bold" fill="#633806">'+fmtCm(colW)+' cm</text>';
-  // left height dim line (only for trapezoid, drawn to the left of piece)
+  // left height dim line + rotated label (trapezoid only)
   if(isTrapez){
     var dlX=r2(px-6);
     s+='<line x1="'+dlX+'" y1="'+tlY+'" x2="'+dlX+'" y2="'+botY+'" stroke="#9a988f" stroke-width="1"/>';
     s+='<line x1="'+r2(dlX-3)+'" y1="'+tlY+'" x2="'+r2(dlX+3)+'" y2="'+tlY+'" stroke="#9a988f" stroke-width="1"/>';
     s+='<line x1="'+r2(dlX-3)+'" y1="'+botY+'" x2="'+r2(dlX+3)+'" y2="'+botY+'" stroke="#9a988f" stroke-width="1"/>';
-    s+='<text x="'+r2(dlX-8)+'" y="'+r2((tlY+botY)/2+4)+'" text-anchor="end" font-size="11" font-weight="bold" fill="#633806">'+fmtCm(leftH)+' cm</text>';
+    var lMid=r2((parseFloat(tlY)+parseFloat(botY))/2);
+    var lcx=pL-16;
+    s+='<text x="'+lcx+'" y="'+lMid+'" text-anchor="middle" font-size="10" font-weight="bold" fill="#633806"'
+      +' transform="rotate(-90 '+lcx+' '+lMid+')">'+fmtCm(leftH)+' cm</text>';
   }
-  // right height dim line (right of piece — for rectangles this is the only height label)
+  // right height dim line + rotated label
   var drX=r2(px+fw+6);
   s+='<line x1="'+drX+'" y1="'+trY+'" x2="'+drX+'" y2="'+botY+'" stroke="#9a988f" stroke-width="1"/>';
   s+='<line x1="'+r2(drX-3)+'" y1="'+trY+'" x2="'+r2(drX+3)+'" y2="'+trY+'" stroke="#9a988f" stroke-width="1"/>';
   s+='<line x1="'+r2(drX-3)+'" y1="'+botY+'" x2="'+r2(drX+3)+'" y2="'+botY+'" stroke="#9a988f" stroke-width="1"/>';
-  s+='<text x="'+r2(drX+9)+'" y="'+r2((trY+botY)/2+4)+'" font-size="11" font-weight="bold" fill="#633806">'+fmtCm(isTrapez?rightH:leftH)+' cm</text>';
+  var rMid=r2((parseFloat(trY)+parseFloat(botY))/2);
+  var rcx=r2(px+fw+16);
+  s+='<text x="'+rcx+'" y="'+rMid+'" text-anchor="middle" font-size="10" font-weight="bold" fill="#633806"'
+    +' transform="rotate(-90 '+rcx+' '+rMid+')">'+fmtCm(isTrapez?rightH:leftH)+' cm</text>';
   s+='</svg>';
   return s;
 }
