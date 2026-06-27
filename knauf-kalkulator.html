@@ -886,6 +886,34 @@ function renderPloce(){
   renderRezniPlan();
 }
 
+function pieceThumbnail(colW, rowH, PH){
+  // Canvas: 130×120 px. Right + bottom padding reserved for dimension labels.
+  var cW=130,cH=120,pL=5,pR=40,pT=5,pB=22;
+  var sc=Math.min((cW-pL-pR)/PLATE_W,(cH-pT-pB)/PH)*0.95;
+  var fpW=r2(PLATE_W*sc),fpH=r2(PH*sc);
+  var fw=r2(colW*sc),fh=r2(rowH*sc);
+  var px=pL,py=pT;
+  var s='<svg width="'+cW+'" height="'+cH+'" style="display:block;margin:0 auto" xmlns="http://www.w3.org/2000/svg">';
+  // full-plate ghost
+  s+='<rect x="'+px+'" y="'+py+'" width="'+fpW+'" height="'+fpH+'" fill="#eeecea" stroke="#ccc" stroke-width="1"/>';
+  // cut piece (top-left aligned)
+  s+='<rect x="'+px+'" y="'+py+'" width="'+fw+'" height="'+fh+'" fill="#fac775" stroke="#ba7517" stroke-width="1.5"/>';
+  // width dimension line (below cut piece)
+  var dlY=r2(py+fh+5);
+  s+='<line x1="'+px+'" y1="'+dlY+'" x2="'+r2(px+fw)+'" y2="'+dlY+'" stroke="#9a988f" stroke-width="1"/>';
+  s+='<line x1="'+px+'" y1="'+r2(dlY-3)+'" x2="'+px+'" y2="'+r2(dlY+3)+'" stroke="#9a988f" stroke-width="1"/>';
+  s+='<line x1="'+r2(px+fw)+'" y1="'+r2(dlY-3)+'" x2="'+r2(px+fw)+'" y2="'+r2(dlY+3)+'" stroke="#9a988f" stroke-width="1"/>';
+  s+='<text x="'+r2(px+fw/2)+'" y="'+r2(dlY+12)+'" text-anchor="middle" font-size="11" font-weight="bold" fill="#633806">'+fmtCm(colW)+' cm</text>';
+  // height dimension line (right of cut piece)
+  var dlX=r2(px+fw+6);
+  s+='<line x1="'+dlX+'" y1="'+py+'" x2="'+dlX+'" y2="'+r2(py+fh)+'" stroke="#9a988f" stroke-width="1"/>';
+  s+='<line x1="'+r2(dlX-3)+'" y1="'+py+'" x2="'+r2(dlX+3)+'" y2="'+py+'" stroke="#9a988f" stroke-width="1"/>';
+  s+='<line x1="'+r2(dlX-3)+'" y1="'+r2(py+fh)+'" x2="'+r2(dlX+3)+'" y2="'+r2(py+fh)+'" stroke="#9a988f" stroke-width="1"/>';
+  s+='<text x="'+r2(dlX+9)+'" y="'+r2(py+fh/2+4)+'" font-size="11" font-weight="bold" fill="#633806">'+fmtCm(rowH)+' cm</text>';
+  s+='</svg>';
+  return s;
+}
+
 function renderRezniPlan(){
   var W=S.duzina_m, PH=S.visina_ploce_m;
   var H=S.oblik==='trapez'?Math.max(S.visina_L_m,S.visina_D_m):S.visina_m;
@@ -895,7 +923,7 @@ function renderRezniPlan(){
   var el=$i('rezni-plan-section');
 
   if(isTrapez){
-    // Trapezoid: every column has unique top height → show positional table
+    // Trapezoid: every column has unique top height → cards sorted left→right
     var rows_t=[];
     for(var li=0;li<offsets.length;li++){
       var cols=plateCols(W,offsets[li]);
@@ -914,46 +942,36 @@ function renderRezniPlan(){
     if(rows_t.length===0){ el.style.display='none'; return; }
     rows_t.sort(function(a,b){ return a.layer-b.layer||a.x-b.x; });
 
-    // Mini trapezoid SVG to orient the installer (L left, D right)
+    // Mini orientation SVG
     var HL=S.visina_L_m, HD=S.visina_D_m, Hm=Math.max(HL,HD);
     var mW=280,mH=60,mPL=4,mPR=4,mPT=4,mPB=4;
     var msc=(mW-mPL-mPR)/W;
     function mXp(m){return mPL+m*msc;}
     function mYp(m){return mPT+(Hm-m)/Hm*(mH-mPT-mPB);}
-    var miniSvg='<svg width="'+mW+'" height="'+mH+'" style="display:block;margin:0 0 10px" xmlns="http://www.w3.org/2000/svg">'
+    var miniSvg='<svg width="'+mW+'" height="'+mH+'" style="display:block;margin:0 0 12px" xmlns="http://www.w3.org/2000/svg">'
       +'<polygon points="'+r2(mXp(0))+','+r2(mYp(HL))+' '+r2(mXp(W))+','+r2(mYp(HD))+' '+r2(mXp(W))+','+r2(mYp(0))+' '+r2(mXp(0))+','+r2(mYp(0))+'" fill="#f0efe8" stroke="#2c2c2a" stroke-width="1.5"/>'
       +'<text x="'+r2(mXp(0)+3)+'" y="'+r2(mYp(HL)+12)+'" font-size="10" fill="#2c2c2a">L: '+fmtCm(HL)+' cm</text>'
       +'<text x="'+r2(mXp(W)-3)+'" y="'+r2(mYp(HD)+12)+'" font-size="10" fill="#2c2c2a" text-anchor="end">D: '+fmtCm(HD)+' cm</text>'
       +'</svg>';
 
     var showLayer=layers===2;
-    var html=miniSvg
-      +'<table class="prof-table"><thead><tr>'
-      +(showLayer?'<th>Sloj</th>':'')
-      +'<th>Od lijevog ruba</th><th>Širina</th><th>Visina reza</th><th>Napomena</th><th>Kom.</th>'
-      +'</tr></thead><tbody>';
+    var html=miniSvg+'<div style="display:flex;flex-wrap:wrap;gap:10px;padding:4px 0">';
     for(var i=0;i<rows_t.length;i++){
       var p=rows_t[i];
-      var notes=[];
-      if(p.cutW) notes.push('reži po širini');
-      if(p.cutH) notes.push('reži po visini');
-      html+='<tr>'
-        +(showLayer?'<td>'+p.layer+'</td>':'')
-        +'<td>'+fmtCm(p.x)+' cm</td>'
-        +'<td><strong>'+fmtCm(p.w)+' cm</strong></td>'
-        +'<td><strong>'+fmtCm(p.h)+' cm</strong></td>'
-        +'<td style="color:#6b6a64;font-size:12px">'+notes.join(' + ')+'</td>'
-        +'<td>2 kom</td>'
-        +'</tr>';
+      var meta='<div style="font-size:11px;color:#9a988f;margin-top:4px">od: '+fmtCm(p.x)+' cm</div>';
+      if(showLayer) meta+='<div style="font-size:11px;color:#9a988f">Sloj '+p.layer+'</div>';
+      meta+='<div style="font-size:12px;color:#5f5e5a;font-weight:500">2 kom</div>';
+      html+='<div style="text-align:center;background:#fff;border:1px solid #e0dfd8;border-radius:6px;padding:8px 10px">'
+        +pieceThumbnail(p.w,p.h,PH)+meta+'</div>';
     }
-    html+='</tbody></table>';
+    html+='</div>';
     html+='<p style="font-size:12px;color:#9a988f;margin:8px 0 0">* 2 kom = obje strane zida'+(showLayer?', po svakom sloju':'')+'. Visinski rez prati nagib stropa — preporuča se mjerenje na licu mjesta.</p>';
     $i('rezni-plan-panel').innerHTML=html;
     el.style.display='';
     return;
   }
 
-  // Rectangular: group by unique (width × height) and show tiles
+  // Rectangular: group by unique (width × height) → cards with thumbnails
   var map={};
   for(var li=0;li<offsets.length;li++){
     var cols=plateCols(W,offsets[li]);
@@ -965,7 +983,7 @@ function renderRezniPlan(){
         var cutW=col.w<PLATE_W-0.005, cutH=rw.h<PH-0.005;
         if(!cutW&&!cutH) continue;
         var key=fmtCm(col.w)+'x'+fmtCm(rw.h);
-        if(!map[key]) map[key]={w:col.w,h:rw.h,wCm:fmtCm(col.w),hCm:fmtCm(rw.h),count:0,cutW:cutW,cutH:cutH,inLayers:{}};
+        if(!map[key]) map[key]={w:col.w,h:rw.h,count:0,inLayers:{}};
         map[key].count++;
         map[key].inLayers[li+1]=true;
       }
@@ -976,29 +994,18 @@ function renderRezniPlan(){
   if(arr.length===0){ el.style.display='none'; return; }
   arr.sort(function(a,b){ return b.w*b.h-a.w*a.h; });
 
-  var BW=80,BH=60;
-  var sc2=Math.min(BW/PLATE_W,BH/PH)*0.9;
-  var fpW=Math.round(PLATE_W*sc2),fpH=Math.round(PH*sc2);
-  var ox=Math.round((BW-fpW)/2),oy=Math.round((BH-fpH)/2);
-
   var html='<div style="display:flex;flex-wrap:wrap;gap:10px;padding:4px 0">';
   for(var i=0;i<arr.length;i++){
     var p=arr[i];
-    var fw=Math.round(p.w*sc2),fh=Math.round(p.h*sc2);
     var layerBadge='';
     if(layers===2){
       var ls=Object.keys(p.inLayers).sort().join('+');
       layerBadge='<div style="font-size:11px;color:#9a988f">Sloj '+ls+'</div>';
     }
-    var svg='<svg width="'+BW+'" height="'+BH+'" style="display:block;margin:0 auto">'
-      +'<rect x="'+ox+'" y="'+oy+'" width="'+fpW+'" height="'+fpH+'" fill="#f0efe8" stroke="#ccc" stroke-width="1" rx="1"/>'
-      +'<rect x="'+ox+'" y="'+oy+'" width="'+fw+'" height="'+fh+'" fill="#fac775" stroke="#ba7517" stroke-width="1.5" rx="1"/>'
-      +'</svg>';
-    html+='<div style="text-align:center;background:#fff;border:1px solid #e0dfd8;border-radius:6px;padding:8px 12px;min-width:110px">'
-      +svg
-      +'<div style="font-size:14px;font-weight:600;margin:5px 0 2px">'+p.wCm+' &#215; '+p.hCm+' cm</div>'
-      +'<div style="font-size:13px;color:#9a988f;font-weight:500">'+p.count+' kom</div>'
+    html+='<div style="text-align:center;background:#fff;border:1px solid #e0dfd8;border-radius:6px;padding:8px 10px">'
+      +pieceThumbnail(p.w,p.h,PH)
       +layerBadge
+      +'<div style="font-size:12px;color:#5f5e5a;font-weight:500;margin-top:4px">'+p.count+' kom</div>'
       +'</div>';
   }
   html+='</div>';
