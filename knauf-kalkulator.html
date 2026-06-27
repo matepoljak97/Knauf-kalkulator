@@ -892,18 +892,77 @@ function renderRezniPlan(){
   var isTrapez=S.oblik==='trapez';
   var layers=S.oblaganje==='dvostruko'?2:1;
   var offsets=layers===2?[0,SPACING]:[0];
+  var el=$i('rezni-plan-section');
 
+  if(isTrapez){
+    // Trapezoid: every column has unique top height → show positional table
+    var rows_t=[];
+    for(var li=0;li<offsets.length;li++){
+      var cols=plateCols(W,offsets[li]);
+      for(var c=0;c<cols.length;c++){
+        var col=cols[c];
+        var colH=wallTopAt(col.x);
+        var rws=plateRows(colH,PH,c);
+        for(var ri=0;ri<rws.length;ri++){
+          var rw=rws[ri];
+          var cutW=col.w<PLATE_W-0.005, cutH=rw.h<PH-0.005;
+          if(!cutW&&!cutH) continue;
+          rows_t.push({x:col.x,w:col.w,h:rw.h,cutW:cutW,cutH:cutH,layer:li+1});
+        }
+      }
+    }
+    if(rows_t.length===0){ el.style.display='none'; return; }
+    rows_t.sort(function(a,b){ return a.layer-b.layer||a.x-b.x; });
+
+    // Mini trapezoid SVG to orient the installer (L left, D right)
+    var HL=S.visina_L_m, HD=S.visina_D_m, Hm=Math.max(HL,HD);
+    var mW=280,mH=60,mPL=4,mPR=4,mPT=4,mPB=4;
+    var msc=(mW-mPL-mPR)/W;
+    function mXp(m){return mPL+m*msc;}
+    function mYp(m){return mPT+(Hm-m)/Hm*(mH-mPT-mPB);}
+    var miniSvg='<svg width="'+mW+'" height="'+mH+'" style="display:block;margin:0 0 10px" xmlns="http://www.w3.org/2000/svg">'
+      +'<polygon points="'+r2(mXp(0))+','+r2(mYp(HL))+' '+r2(mXp(W))+','+r2(mYp(HD))+' '+r2(mXp(W))+','+r2(mYp(0))+' '+r2(mXp(0))+','+r2(mYp(0))+'" fill="#f0efe8" stroke="#2c2c2a" stroke-width="1.5"/>'
+      +'<text x="'+r2(mXp(0)+3)+'" y="'+r2(mYp(HL)+12)+'" font-size="10" fill="#2c2c2a">L: '+fmtCm(HL)+' cm</text>'
+      +'<text x="'+r2(mXp(W)-3)+'" y="'+r2(mYp(HD)+12)+'" font-size="10" fill="#2c2c2a" text-anchor="end">D: '+fmtCm(HD)+' cm</text>'
+      +'</svg>';
+
+    var showLayer=layers===2;
+    var html=miniSvg
+      +'<table class="prof-table"><thead><tr>'
+      +(showLayer?'<th>Sloj</th>':'')
+      +'<th>Od lijevog ruba</th><th>Širina</th><th>Visina reza</th><th>Napomena</th><th>Kom.</th>'
+      +'</tr></thead><tbody>';
+    for(var i=0;i<rows_t.length;i++){
+      var p=rows_t[i];
+      var notes=[];
+      if(p.cutW) notes.push('reži po širini');
+      if(p.cutH) notes.push('reži po visini');
+      html+='<tr>'
+        +(showLayer?'<td>'+p.layer+'</td>':'')
+        +'<td>'+fmtCm(p.x)+' cm</td>'
+        +'<td><strong>'+fmtCm(p.w)+' cm</strong></td>'
+        +'<td><strong>'+fmtCm(p.h)+' cm</strong></td>'
+        +'<td style="color:#6b6a64;font-size:12px">'+notes.join(' + ')+'</td>'
+        +'<td>2 kom</td>'
+        +'</tr>';
+    }
+    html+='</tbody></table>';
+    html+='<p style="font-size:12px;color:#9a988f;margin:8px 0 0">* 2 kom = obje strane zida'+(showLayer?', po svakom sloju':'')+'. Visinski rez prati nagib stropa — preporuča se mjerenje na licu mjesta.</p>';
+    $i('rezni-plan-panel').innerHTML=html;
+    el.style.display='';
+    return;
+  }
+
+  // Rectangular: group by unique (width × height) and show tiles
   var map={};
   for(var li=0;li<offsets.length;li++){
     var cols=plateCols(W,offsets[li]);
     for(var c=0;c<cols.length;c++){
       var col=cols[c];
-      var colH=isTrapez?wallTopAt(col.x):H;
-      var rows=plateRows(colH,PH,c);
-      for(var ri=0;ri<rows.length;ri++){
-        var rw=rows[ri];
-        var cutW=col.w<PLATE_W-0.005;
-        var cutH=rw.h<PH-0.005;
+      var rws=plateRows(H,PH,c);
+      for(var ri=0;ri<rws.length;ri++){
+        var rw=rws[ri];
+        var cutW=col.w<PLATE_W-0.005, cutH=rw.h<PH-0.005;
         if(!cutW&&!cutH) continue;
         var key=fmtCm(col.w)+'x'+fmtCm(rw.h);
         if(!map[key]) map[key]={w:col.w,h:rw.h,wCm:fmtCm(col.w),hCm:fmtCm(rw.h),count:0,cutW:cutW,cutH:cutH,inLayers:{}};
@@ -912,16 +971,11 @@ function renderRezniPlan(){
       }
     }
   }
-
   var arr=[];
   for(var k in map){ map[k].count*=2; arr.push(map[k]); }
-
-  var el=$i('rezni-plan-section');
   if(arr.length===0){ el.style.display='none'; return; }
-
   arr.sort(function(a,b){ return b.w*b.h-a.w*a.h; });
 
-  // Thumbnail: piece (orange) shown within full-plate ghost (grey)
   var BW=80,BH=60;
   var sc2=Math.min(BW/PLATE_W,BH/PH)*0.9;
   var fpW=Math.round(PLATE_W*sc2),fpH=Math.round(PH*sc2);
@@ -931,9 +985,6 @@ function renderRezniPlan(){
   for(var i=0;i<arr.length;i++){
     var p=arr[i];
     var fw=Math.round(p.w*sc2),fh=Math.round(p.h*sc2);
-    var cutNote=[];
-    if(p.cutW) cutNote.push('š: '+p.wCm+' cm');
-    if(p.cutH) cutNote.push('v: '+p.hCm+' cm');
     var layerBadge='';
     if(layers===2){
       var ls=Object.keys(p.inLayers).sort().join('+');
@@ -953,7 +1004,6 @@ function renderRezniPlan(){
   html+='</div>';
   html+='<p style="font-size:12px;color:#9a988f;margin:8px 0 0">* Uključuje obje strane zida'
     +(layers===2?', oba sloja':'')+'. Bez 10% rezerve za otpad. Oko otvora (vrata/prozori) mogući su L-rezovi.</p>';
-
   $i('rezni-plan-panel').innerHTML=html;
   el.style.display='';
 }
