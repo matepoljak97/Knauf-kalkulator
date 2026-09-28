@@ -159,7 +159,7 @@ h2 { font-size: 16px; font-weight: 600; margin: 0 0 8px; }
         <thead><tr><th style="width:58%">Stavka</th><th>Količina</th><th>Jedinica</th></tr></thead>
         <tbody id="prof-tbody"></tbody>
       </table>
-      <p style="font-size:12px;color:#9a988f;margin:8px 0 0">* Uključuje 10% rezerve za otpad i rezanje.</p>
+      <p style="font-size:12px;color:#9a988f;margin:8px 0 0">* UW tračnica i brtvena traka uključuju 10% rezerve za otpad i rezanje. CW/UA stupovi su točan potreban broj (bez rezerve).</p>
     </div>
   </div>
 
@@ -210,7 +210,9 @@ var drag = null;
 
 // ── HELPERS ──────────────────────────────────────────────────
 function $i(id){ return document.getElementById(id); }
-function r2(x){ return Math.round(x * 100) / 100; }
+// Zaokruži na milimetar (ne centimetar!) — čisti float šum, ali čuva pola-cm
+// pozicije (57.5cm, 62.5cm...) koje se inače gube pri zaokruživanju na cm.
+function r2(x){ return Math.round(x * 1000) / 1000; }
 function fmtCm(m){ var c=Math.round(m*1000)/10; return c%1===0 ? String(Math.round(c)) : c.toFixed(1); }
 function findOtvor(id){
   for(var i=0;i<S.otvori.length;i++) if(S.otvori[i].id===id) return S.otvori[i];
@@ -235,6 +237,27 @@ function readInputs(){
 
 function calcRaster(){
   return S.cw_razmak === '41.7' ? 0.417 : 0.625;
+}
+
+function calcFirstOffset(){
+  var DEF = 0.575;
+  var raster = calcRaster();
+  var W = S.duzina_m;
+  if(W <= DEF + 0.001) return W / 2;
+  // Broj CW intervala od prvog profila do desnog zida (s defaultom 57.5cm)
+  var N = Math.floor((W - DEF) / raster);
+  // Udaljenost zadnjeg CW od desnog zida
+  var lastDist = W - DEF - N * raster;
+  // Ako je zadnji CW >= 25cm od zida — ostaviti default
+  if(lastDist >= 0.249) return DEF;
+  // Inače balansiraj: prvi profil = zadnji profil od zida
+  return (W - N * raster) / 2;
+}
+
+// Širina prve (skraćene) ploče: proteže se od ruba zida do DRUGOG profila
+// (prvi profil je samo sredina ploče, ne rub) — tj. firstOffset + jedan raster.
+function calcFirstBoardW(){
+  return r2(calcFirstOffset() + calcRaster());
 }
 
 // ── WALL SHAPE ────────────────────────────────────────────────
@@ -378,8 +401,10 @@ function calcCWPositions(){
   var duzina = S.duzina_m;
   var map = {};
 
-  // Basic raster studs
-  var x = 0;
+  // Basic raster studs — x=0, zatim firstOffset, pa svakih raster cm
+  var firstOff = calcFirstOffset();
+  map[0] = { x_m: 0, type:'basic' };
+  var x = firstOff;
   while(x <= duzina + 0.001){
     var key = Math.round(r2(x)*1000);
     if(!map[key]) map[key] = { x_m: r2(x), type:'basic' };
@@ -410,6 +435,20 @@ function calcCWPositions(){
     map[Math.round(xb*1000)] = { x_m: xb, type:'door_stub', stubBot: o.visina_m };
   }
 
+  // Ukloni raster stupove preblizu ruba otvora (unutar 15cm) — UA/pojačanje na
+  // rubu otvora već daje podlogu, dodatni stup toliko blizu je nepraktičan.
+  var MIN_GAP_OTVOR = 0.15;
+  for(var i=0;i<S.otvori.length;i++){
+    var o = S.otvori[i];
+    var xL = r2(Math.max(0, o.x_m)), xR = r2(Math.min(duzina, o.x_m+o.sirina_m));
+    for(var k in map){
+      if(map[k].type!=='basic') continue;
+      var xm = map[k].x_m;
+      if(xm < 0.001 || xm > duzina-0.001) continue; // rub zida se nikad ne miče
+      if(Math.min(Math.abs(xm-xL), Math.abs(xm-xR)) < MIN_GAP_OTVOR) delete map[k];
+    }
+  }
+
   // Uvijek stup na desnom rubu zida
   var edgeKey = Math.round(r2(S.duzina_m)*1000);
   if(!map[edgeKey]) map[edgeKey] = { x_m: r2(S.duzina_m), type:'basic' };
@@ -426,7 +465,7 @@ function drawProfili(){
   var visinL = S.oblik==='trapez' ? S.visina_L_m : S.visina_m;
   var visinR = S.oblik==='trapez' ? S.visina_D_m : S.visina_m;
   var visina = Math.max(visinL, visinR);
-  var SVG_W=820, PL=8, PR=8, PT=24, PB=24;
+  var SVG_W=820, PL=8, PR=8, PT=24, PB=48;
   var scale = (SVG_W-PL-PR) / duzina;
   var wallH = visina * scale;
   var SVG_H = wallH + PT + PB;
@@ -532,13 +571,35 @@ function drawProfili(){
     s += rect(Xs(0), Ys(visina), duzina*scale, wallH, 'none', '#2c2c2a', 2);
   }
 
-  // Dimension text
-  var raster = calcRaster();
+  // Kotna linija ispod zida — razmak između SVAKOG para profila, direktno na slici
+  var dimPts = [];
+  for(var i=0;i<cwPos.length;i++){
+    if(cwPos[i].type==='door_stub') continue; // kratki komadi iznad vrata se ne kotiraju
+    if(cwPos[i].x_m < -0.001 || cwPos[i].x_m > duzina+0.001) continue;
+    dimPts.push(cwPos[i].x_m);
+  }
+  dimPts.sort(function(a,b){ return a-b; });
+  var dimY = r2(Ys(0) + 11);
+  if(dimPts.length>1){
+    s += '<line x1="'+r2(Xs(dimPts[0]))+'" y1="'+dimY+'" x2="'+r2(Xs(dimPts[dimPts.length-1]))+'" y2="'+dimY+'" stroke="#aaa8a0" stroke-width="1"/>';
+    for(var i=0;i<dimPts.length;i++){
+      s += '<line x1="'+r2(Xs(dimPts[i]))+'" y1="'+(dimY-4)+'" x2="'+r2(Xs(dimPts[i]))+'" y2="'+(dimY+4)+'" stroke="#aaa8a0" stroke-width="1"/>';
+    }
+    for(var i=0;i<dimPts.length-1;i++){
+      var gx1=dimPts[i], gx2=dimPts[i+1], gapCm=fmtCm(gx2-gx1);
+      var midPx = r2((Xs(gx1)+Xs(gx2))/2);
+      var segPx = Xs(gx2)-Xs(gx1);
+      if(segPx > 22){
+        s += '<text x="'+midPx+'" y="'+(dimY+15)+'" text-anchor="middle" font-size="10.5" fill="#6b6a64">'+gapCm+'</text>';
+      }
+    }
+  }
+
+  // Kratki naslov mjera zida (samo osnovno — razmaci su sad na slici)
   var dimTxt = S.oblik==='trapez'
     ? Math.round(S.duzina_m*100)+' cm &#215; '+Math.round(visinL*100)+'/'+Math.round(visinR*100)+' cm'
     : Math.round(S.duzina_m*100)+' cm &#215; '+Math.round(S.visina_m*100)+' cm';
-  s += '<text x="'+SVG_W/2+'" y="'+(SVG_H-6)+'" text-anchor="middle" font-size="11" fill="#6b6a64">'+
-       dimTxt+' &nbsp;&nbsp;|&nbsp;&nbsp; CW razmak: '+(raster*100).toFixed(1)+' cm</text>';
+  s += '<text x="'+SVG_W/2+'" y="'+(SVG_H-6)+'" text-anchor="middle" font-size="11" fill="#6b6a64">'+dimTxt+'</text>';
 
   s += '</svg>';
   $i('profili-svg-wrap').innerHTML = s;
@@ -666,7 +727,9 @@ function calcAndShowProfili(){
     else if(cwPos[i].type==='door_stub') nStub++;
   }
   var dCW = r2(visina-0.01);
-  var nCW = Math.ceil((nBasic+nReinf+nStub)*1.10);
+  // Točan broj pozicija (bez rezerve) — CW je diskretan popis stupova, ne dužinski
+  // materijal, pa 10% rezerva za otpad ovdje nema smisla kao kod UW/trake.
+  var nCW = nBasic+nReinf+nStub;
 
   // Pričvrsna roba
   var area = duzina*visina*2;
@@ -730,6 +793,60 @@ function plateRows(H, PH, colIdx){
   while(y<H-0.001){ var h=Math.min(PH,H-y); arr.push({y:y,h:r2(h),cut:h<PH}); y+=PH; }
   return arr;
 }
+
+// Stvarno potrebni komadi ploča za jedan sloj (offset), uvažavajući:
+// — kosinu zida (trapez): svaki stupac koristi visinu na svojoj x poziciji, ne max visinu zida
+// — otvore (vrata/prozori): dio ploče unutar otvora se izrezuje i ne troši materijal
+function collectPieces(W, PH, offset){
+  var isTrapez = S.oblik === 'trapez';
+  var cols = plateCols(W, offset);
+  var pieces = [];
+  for(var c=0; c<cols.length; c++){
+    var col = cols[c];
+    var colH = isTrapez ? wallTopAt(col.x) : S.visina_m;
+    var rows = plateRows(colH, PH, c);
+
+    // Podijeli stupac na dijelove po rubovima otvora koji sijeku ovaj stupac
+    var xPts = [col.x, r2(col.x+col.w)];
+    for(var oi=0; oi<S.otvori.length; oi++){
+      var o = S.otvori[oi];
+      var oxL = Math.max(col.x, o.x_m), oxR = Math.min(col.x+col.w, o.x_m+o.sirina_m);
+      if(oxR - oxL > 0.005){ xPts.push(r2(oxL)); xPts.push(r2(oxR)); }
+    }
+    xPts.sort(function(a,b){ return a-b; });
+    var ux=[];
+    for(var xi=0; xi<xPts.length; xi++){ if(xi===0 || xPts[xi]-ux[ux.length-1]>0.005) ux.push(xPts[xi]); }
+
+    for(var xi=0; xi<ux.length-1; xi++){
+      var sx1=ux[xi], sx2=ux[xi+1], sw=r2(sx2-sx1);
+      if(sw<0.005) continue;
+      for(var ri=0; ri<rows.length; ri++){
+        var rw = rows[ri];
+        var rwTop = r2(rw.y+rw.h);
+        var voided=false;
+        for(var oi=0; oi<S.otvori.length; oi++){
+          var o=S.otvori[oi];
+          var oyBot = o.tip==='vrata' ? 0 : o.sill_m;
+          var oyTop = oyBot + o.visina_m;
+          if(o.x_m<=sx1+0.005 && o.x_m+o.sirina_m>=sx2-0.005 && oyBot<=rw.y+0.005 && oyTop>=rwTop-0.005){
+            voided=true; break;
+          }
+        }
+        if(voided) continue;
+        var isCeiling = (ri===rows.length-1);
+        var leftH=rw.h, rightH=rw.h;
+        if(isTrapez && isCeiling){
+          leftH = r2(wallTopAt(sx1)-rw.y);
+          rightH = r2(wallTopAt(sx2)-rw.y);
+        }
+        pieces.push({ x:sx1, w:sw, y:rw.y, h:rw.h, leftH:leftH, rightH:rightH,
+                      isCeiling:isCeiling, colIdx:c, cutW:sw<PLATE_W-0.005, rowCut:rw.cut });
+      }
+    }
+  }
+  return pieces;
+}
+
 function drawPloce(elId, W, H, PH, offset){
   var isTrapez=S.oblik==='trapez';
   var HL=isTrapez?S.visina_L_m:H, HD=isTrapez?S.visina_D_m:H;
@@ -737,7 +854,6 @@ function drawPloce(elId, W, H, PH, offset){
   var mxW=820,pL=8,pR=8,pT=8,pB=26;
   var sc=(mxW-pL-pR)/W;
   var vbH=Hmax*sc+pT+pB;
-  var cols=plateCols(W,offset);
   function Xp(m){return pL+m*sc;}
   function Yp(m){return pT+(Hmax-m)*sc;}
   var s='<svg width="100%" viewBox="0 0 '+mxW+' '+vbH+'" xmlns="http://www.w3.org/2000/svg" style="max-width:'+mxW+'px">';
@@ -748,31 +864,35 @@ function drawPloce(elId, W, H, PH, offset){
       +'</clipPath></defs>';
     s+='<g clip-path="url(#'+clipId+')">';
   }
-  for(var c=0;c<cols.length;c++){
-    var col=cols[c];
-    var colH=isTrapez?wallTopAt(col.x):H;
-    var rows=plateRows(colH,PH,c);
-    for(var ri=0;ri<rows.length;ri++){
-      var rw=rows[ri];
-      var px=Xp(col.x),py=Yp(rw.y+rw.h),pw=col.w*sc,ph=rw.h*sc;
-      var fill=rw.cut?'#fac775':'#b5d4f4';
-      var strk=rw.cut?'#ba7517':'#185fa5';
-      s+='<rect x="'+r2(px)+'" y="'+r2(py)+'" width="'+r2(pw)+'" height="'+r2(ph)+'" fill="'+fill+'" stroke="'+strk+'" stroke-width="1"/>';
-      if(pw>30 && ph>14){
-        s+='<text x="'+r2(px+pw/2)+'" y="'+r2(py+ph/2+4)+'" text-anchor="middle" font-size="11" fill="'+(rw.cut?'#633806':'#0c447c')+'">'+fmtCm(col.w)+'&#215;'+fmtCm(rw.h)+'</text>';
-      }
+  // Komadi identični onima u reznom planu (collectPieces) — otvori su već
+  // izrezani iz potrebe, umjesto da se cijela ploča crta pa prekriva bijelim.
+  var pieces = collectPieces(W, PH, offset);
+  for(var pi=0;pi<pieces.length;pi++){
+    var p=pieces[pi];
+    var isCut = p.cutW || p.rowCut;
+    var px=Xp(p.x),py=Yp(p.y+p.h),pw=p.w*sc,ph=p.h*sc;
+    var fill=isCut?'#fac775':'#b5d4f4';
+    var strk=isCut?'#ba7517':'#185fa5';
+    s+='<rect x="'+r2(px)+'" y="'+r2(py)+'" width="'+r2(pw)+'" height="'+r2(ph)+'" fill="'+fill+'" stroke="'+strk+'" stroke-width="1"/>';
+    if(pw>30 && ph>14){
+      s+='<text x="'+r2(px+pw/2)+'" y="'+r2(py+ph/2+4)+'" text-anchor="middle" font-size="11" fill="'+(isCut?'#633806':'#0c447c')+'">'+fmtCm(p.w)+'&#215;'+fmtCm(p.h)+'</text>';
     }
   }
   if(isTrapez) s+='</g>';
-  // Profile lines — isti raster kao na prikazu profila
+  // Profile lines — isti raster kao CW profili (x=0, firstOff, pa svakih rast cm)
   var rast=calcRaster();
-  var n=Math.ceil(W/rast);
-  for(var i=0;i<=n;i++){
-    var lx=Xp(Math.min(i*rast,W));
-    var lineTop=isTrapez?r2(Yp(wallTopAt(Math.min(i*rast,W)))):pT;
+  var firstOff2=calcFirstOffset();
+  var profSeen={}, profToAdd=[0, W];
+  for(var ppx=firstOff2; ppx<W-0.001; ppx=r2(ppx+rast)) profToAdd.push(ppx);
+  for(var pi=0;pi<profToAdd.length;pi++){
+    var pxc=r2(profToAdd[pi]), pk=Math.round(pxc*1000);
+    if(profSeen[pk]) continue; profSeen[pk]=true;
+    var lx=Xp(pxc);
+    var lineTop=isTrapez?r2(Yp(wallTopAt(pxc))):pT;
     s+='<line x1="'+r2(lx)+'" y1="'+lineTop+'" x2="'+r2(lx)+'" y2="'+r2(Yp(0))+'" stroke="#5f5e5a" stroke-width="2" stroke-dasharray="3 3" opacity="0.5"/>';
   }
-  // Otvor masking — prekrij ploče gdje su otvori
+  // Obris otvora — komadi oko otvora su već izrezani (collectPieces), ovdje
+  // samo ocrtavamo gdje je otvor radi jasnoće (bez otvora ploče tu nema).
   for(var oi=0;oi<S.otvori.length;oi++){
     var ov=S.otvori[oi];
     if(ov.x_m > W+0.001 || ov.x_m+ov.sirina_m < -0.001) continue;
@@ -785,7 +905,6 @@ function drawPloce(elId, W, H, PH, offset){
       oy2=r2(Yp(ov.sill_m+ov.visina_m)); oh2=r2(ov.visina_m*sc);
     }
     if(ow2>0 && oh2>0){
-      s+='<rect x="'+ox2+'" y="'+oy2+'" width="'+ow2+'" height="'+oh2+'" fill="#fff" stroke="none"/>';
       s+='<rect x="'+ox2+'" y="'+oy2+'" width="'+ow2+'" height="'+oh2+'" fill="none" stroke="#2c2c2a" stroke-width="1.5" stroke-dasharray="5 3"/>';
       if(ow2>24 && oh2>14) s+='<text x="'+r2(parseFloat(ox2)+ow2/2)+'" y="'+r2(parseFloat(oy2)+oh2/2+4)+'" text-anchor="middle" font-size="11" fill="#6b6a64">'+(ov.tip==='vrata'?'VRATA':'PROZOR')+'</text>';
     }
@@ -803,26 +922,38 @@ function drawPloce(elId, W, H, PH, offset){
 
 // ── CUTTING OPTIMISATION (spec-krojenje-optimizacija.md) ─────
 function calcOptimizacija(){
-  var W=S.duzina_m, H=S.visina_m, PH=S.visina_ploce_m;
+  var W=S.duzina_m, PH=S.visina_ploce_m;
   var layers = S.oblaganje==='dvostruko' ? 2 : 1;
-  var offsets = layers===2 ? [0, SPACING] : [0];
+  var firstBoardW=calcFirstBoardW();
+  // Sloj 2 pomaknut za pola ploče (SPACING) u odnosu na sloj 1 — oduzimamo, ne
+  // zbrajamo, jer prva ploča sloja 1 već sadrži puni raster (firstOff+raster);
+  // zbrajanje bi dalo prvu ploču širu od 125cm, što fizički ne postoji.
+  var offsets = layers===2 ? [firstBoardW, r2(firstBoardW-SPACING)] : [firstBoardW];
   var warns=[];
 
-  // Collect all needed widths (both layers)
+  // Collect all needed widths (both layers) — kroz collectPieces koji uvažava
+  // kosinu zida (trapez) i izrezuje dio ploče unutar otvora (vrata/prozori)
   var needs=[];
+  var slivers={};
   for(var li=0;li<offsets.length;li++){
     var cols=plateCols(W,offsets[li]);
-    // Check edge pieces
+    // Check edge pieces (rub zida)
     if(cols.length>0){
-      var last=cols[cols.length-1];
-      if(last.w < MIN_KOMAD && last.w > 0.001){
-        warns.push('Sloj '+(li+1)+': zadnji komad = '+Math.round(last.w*100)+' cm &lt; 30 cm. Razmotri pomak ploča.');
-      }
+      var first=cols[0], last=cols[cols.length-1];
+      if(first.w < 0.25 && first.w > 0.001)
+        warns.push('Sloj '+(li+1)+': prvi komad = '+Math.round(first.w*100)+' cm &lt; 25 cm.');
+      if(cols.length>1 && last.w < 0.25 && last.w > 0.001)
+        warns.push('Sloj '+(li+1)+': zadnji komad = '+Math.round(last.w*100)+' cm &lt; 25 cm.');
     }
-    for(var c=0;c<cols.length;c++){
-      var rows=plateRows(H,PH,c);
-      for(var ri=0;ri<rows.length;ri++){
-        needs.push(cols[c].w);
+    var pieces = collectPieces(W, PH, offsets[li]);
+    for(var pi=0;pi<pieces.length;pi++){
+      var p = pieces[pi];
+      needs.push(p.w);
+      if(p.w>0.001 && p.w<0.25){
+        var skey=li+'_'+Math.round(p.x*1000);
+        if(!slivers[skey]){ slivers[skey]=true;
+          warns.push('Sloj '+(li+1)+': uzak komad uz otvor ('+Math.round(p.w*100)+' cm) na '+Math.round(p.x*100)+' cm — razmotri pomak otvora.');
+        }
       }
     }
   }
@@ -861,18 +992,28 @@ function renderPloce(){
   var W=S.duzina_m, PH=S.visina_ploce_m;
   var H=S.oblik==='trapez'?Math.max(S.visina_L_m,S.visina_D_m):S.visina_m;
   var layers = S.oblaganje==='dvostruko' ? 2 : 1;
+  var firstOff=calcFirstOffset();
+  var firstBoardW=calcFirstBoardW();
   var opt = calcOptimizacija();
 
-  drawPloce('layer1', W, H, PH, 0);
+  drawPloce('layer1', W, H, PH, firstBoardW);
 
   var uw = r2(W*2);
   var wool = r2(W*H);
 
+  var rasterP = calcRaster();
+  var firstOffLabel = fmtCm(firstBoardW)+' cm'+(Math.abs(firstBoardW-(0.575+rasterP))>0.001?' (prilag.)':'');
+  var nLastP = Math.floor((W - firstOff) / rasterP);
+  var lastCWxP = firstOff + nLastP * rasterP;
+  if(lastCWxP >= W - 0.001){ nLastP--; lastCWxP -= rasterP; }
+  var lastCWdistP = W - lastCWxP;
   $i('cards-ploce').innerHTML =
     cardHtml('Gips ploče', opt.plates, 'kom') +
     cardHtml('Rezova', opt.rezovi, 'kom') +
     cardHtml('Mineralna vuna', wool, 'm²') +
-    cardHtml('UW tračnica', uw, 'm');
+    cardHtml('UW tračnica', uw, 'm') +
+    cardHtml('1. ploča (širina)', firstOffLabel, '') +
+    cardHtml('Zadnji CW od zida', fmtCm(lastCWdistP)+' cm', '');
 
   var wbp=$i('warn-box-ploce'), wlp=$i('warn-list-ploce');
   var allWarns = opt.warns.slice();
@@ -880,7 +1021,7 @@ function renderPloce(){
   if(allWarns.length){ wlp.innerHTML=allWarns.map(function(w){return'<li>'+w+'</li>';}).join(''); wbp.style.display=''; }
   else wbp.style.display='none';
 
-  if(layers===2){ drawPloce('layer2', W, H, PH, SPACING); $i('layer2block').style.display=''; }
+  if(layers===2){ drawPloce('layer2', W, H, PH, r2(firstBoardW-SPACING)); $i('layer2block').style.display=''; }
   else $i('layer2block').style.display='none';
 
   renderRezniPlan();
@@ -937,35 +1078,23 @@ function pieceThumbnail(colW, leftH, rightH, PH){
 
 function renderRezniPlan(){
   var W=S.duzina_m, PH=S.visina_ploce_m;
-  var H=S.oblik==='trapez'?Math.max(S.visina_L_m,S.visina_D_m):S.visina_m;
   var isTrapez=S.oblik==='trapez';
   var layers=S.oblaganje==='dvostruko'?2:1;
-  var offsets=layers===2?[0,SPACING]:[0];
+  var firstBoardW=calcFirstBoardW();
+  var offsets=layers===2?[firstBoardW,r2(firstBoardW-SPACING)]:[firstBoardW];
   var el=$i('rezni-plan-section');
 
   if(isTrapez){
     // Trapezoid: ceiling piece has slanted top → leftH and rightH differ per column
     var rows_t=[];
     for(var li=0;li<offsets.length;li++){
-      var cols=plateCols(W,offsets[li]);
-      for(var c=0;c<cols.length;c++){
-        var col=cols[c];
-        var hL=wallTopAt(col.x);
-        var hR=wallTopAt(Math.min(col.x+col.w, W));
-        var rws=plateRows(hL,PH,c);
-        var cutW=col.w<PLATE_W-0.005;
-        // Ceiling piece = last row; its top follows the slanted wall
-        var lastRw=rws[rws.length-1];
-        var baseY=lastRw.y;
-        var ceilL=hL-baseY, ceilR=hR-baseY;
-        var needCut=cutW||(ceilL<PH-0.005)||Math.abs(ceilL-ceilR)>0.005;
-        if(needCut) rows_t.push({x:col.x,w:col.w,leftH:ceilL,rightH:ceilR,layer:li+1});
-        // Non-ceiling pieces below (stagger cuts) — always rectangular
-        for(var ri=0;ri<rws.length-1;ri++){
-          var rw=rws[ri];
-          if((col.w<PLATE_W-0.005)||(rw.h<PH-0.005))
-            rows_t.push({x:col.x,w:col.w,leftH:rw.h,rightH:rw.h,layer:li+1});
-        }
+      var pieces=collectPieces(W,PH,offsets[li]);
+      for(var pi=0;pi<pieces.length;pi++){
+        var p=pieces[pi];
+        var needCut = p.isCeiling
+          ? (p.cutW || p.leftH<PH-0.005 || Math.abs(p.leftH-p.rightH)>0.005)
+          : (p.cutW || p.rowCut);
+        if(needCut) rows_t.push({x:p.x,w:p.w,leftH:p.leftH,rightH:p.rightH,layer:li+1});
       }
     }
     if(rows_t.length===0){ el.style.display='none'; return; }
@@ -1003,19 +1132,14 @@ function renderRezniPlan(){
   // Rectangular: group by unique (width × height) → cards with thumbnails
   var map={};
   for(var li=0;li<offsets.length;li++){
-    var cols=plateCols(W,offsets[li]);
-    for(var c=0;c<cols.length;c++){
-      var col=cols[c];
-      var rws=plateRows(H,PH,c);
-      for(var ri=0;ri<rws.length;ri++){
-        var rw=rws[ri];
-        var cutW=col.w<PLATE_W-0.005, cutH=rw.h<PH-0.005;
-        if(!cutW&&!cutH) continue;
-        var key=fmtCm(col.w)+'x'+fmtCm(rw.h);
-        if(!map[key]) map[key]={w:col.w,h:rw.h,count:0,inLayers:{}};
-        map[key].count++;
-        map[key].inLayers[li+1]=true;
-      }
+    var pieces=collectPieces(W,PH,offsets[li]);
+    for(var pi=0;pi<pieces.length;pi++){
+      var p=pieces[pi];
+      if(!p.cutW && !p.rowCut) continue;
+      var key=fmtCm(p.w)+'x'+fmtCm(p.h);
+      if(!map[key]) map[key]={w:p.w,h:p.h,count:0,inLayers:{}};
+      map[key].count++;
+      map[key].inLayers[li+1]=true;
     }
   }
   var arr=[];
@@ -1039,7 +1163,7 @@ function renderRezniPlan(){
   }
   html+='</div>';
   html+='<p style="font-size:12px;color:#9a988f;margin:8px 0 0">* Uključuje obje strane zida'
-    +(layers===2?', oba sloja':'')+'. Bez 10% rezerve za otpad. Oko otvora (vrata/prozori) mogući su L-rezovi.</p>';
+    +(layers===2?', oba sloja':'')+'. Bez 10% rezerve za otpad. Otvori (vrata/prozori) su izuzeti iz potrebne količine.</p>';
   $i('rezni-plan-panel').innerHTML=html;
   el.style.display='';
 }
