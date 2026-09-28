@@ -796,12 +796,11 @@ function plateRows(H, PH, colIdx){
 
 // Stvarno potrebni komadi ploča za jedan sloj (offset), uvažavajući:
 // — kosinu zida (trapez): svaki stupac koristi visinu na svojoj x poziciji, ne max visinu zida
-// — otvore (vrata/prozori): dio ploče unutar otvora se izrezuje i ne troši materijal
-//
-// Otvor se reže i po X (rub otvora) I po Y (visina praga/nadvratnika) — inače
-// komad koji visinom prelazi PREKO otvora (npr. od poda do stropa dok otvor
-// ide samo do 200cm) ostane cijeli i vizualno "prekriva" otvor umjesto da se
-// razdijeli na dio unutar otvora (izbačen) i dio iznad njega (zadržan).
+// — otvore (vrata/prozori): ploča se NIKAD ne reže/dijeli točno na rubu otvora
+//   (spoj ploča na ivici okvira vrata je loša praksa — puca). Umjesto toga,
+//   ploča ide preko otvora kao cjelina, a otvor se izreže kao rupa u njoj
+//   (hasOpening=true). Materijal se štedi SAMO kad je čitava ćelija (stupac
+//   × red) u potpunosti unutar otvora — tad ta ćelija uopće nije potrebna.
 function collectPieces(W, PH, offset){
   var isTrapez = S.oblik === 'trapez';
   var cols = plateCols(W, offset);
@@ -809,71 +808,33 @@ function collectPieces(W, PH, offset){
   for(var c=0; c<cols.length; c++){
     var col = cols[c];
     var colH = isTrapez ? wallTopAt(col.x) : S.visina_m;
-    var baseRows = plateRows(colH, PH, c);
-
-    // Podijeli stupac na dijelove po rubovima otvora koji sijeku ovaj stupac
-    var xPts = [col.x, r2(col.x+col.w)];
-    for(var oi=0; oi<S.otvori.length; oi++){
-      var o = S.otvori[oi];
-      var oxL = Math.max(col.x, o.x_m), oxR = Math.min(col.x+col.w, o.x_m+o.sirina_m);
-      if(oxR - oxL > 0.005){ xPts.push(r2(oxL)); xPts.push(r2(oxR)); }
-    }
-    xPts.sort(function(a,b){ return a-b; });
-    var ux=[];
-    for(var xi=0; xi<xPts.length; xi++){ if(xi===0 || xPts[xi]-ux[ux.length-1]>0.005) ux.push(xPts[xi]); }
-
-    for(var xi=0; xi<ux.length-1; xi++){
-      var sx1=ux[xi], sx2=ux[xi+1], sw=r2(sx2-sx1);
-      if(sw<0.005) continue;
-
-      // Otvori čiji x-raspon u potpunosti pokriva ovaj (već razrezani) segment
-      var spanOtv=[];
+    var rows = plateRows(colH, PH, c);
+    for(var ri=0; ri<rows.length; ri++){
+      var rw = rows[ri];
+      var rwTop = r2(rw.y+rw.h);
+      var voided=false, hasOpening=false;
       for(var oi=0; oi<S.otvori.length; oi++){
         var o=S.otvori[oi];
-        if(o.x_m<=sx1+0.005 && o.x_m+o.sirina_m>=sx2-0.005) spanOtv.push(o);
-      }
-
-      for(var ri=0; ri<baseRows.length; ri++){
-        var br = baseRows[ri];
-        var brTop = r2(br.y+br.h);
-        var isTopRow = (ri===baseRows.length-1);
-
-        // Y-rubovi otvora (prag/nadvratnik) unutar ovog reda — dodatno režu red
-        var yPts=[br.y, brTop];
-        for(var oi=0; oi<spanOtv.length; oi++){
-          var o=spanOtv[oi];
-          var oyBot = o.tip==='vrata' ? 0 : o.sill_m;
-          var oyTop = oyBot + o.visina_m;
-          if(oyBot>br.y+0.005 && oyBot<brTop-0.005) yPts.push(r2(oyBot));
-          if(oyTop>br.y+0.005 && oyTop<brTop-0.005) yPts.push(r2(oyTop));
-        }
-        yPts.sort(function(a,b){ return a-b; });
-        var uy=[];
-        for(var yi=0; yi<yPts.length; yi++){ if(yi===0 || yPts[yi]-uy[uy.length-1]>0.005) uy.push(yPts[yi]); }
-
-        for(var yi=0; yi<uy.length-1; yi++){
-          var sy1=uy[yi], sy2=uy[yi+1], sh=r2(sy2-sy1);
-          if(sh<0.005) continue;
-
-          var voided=false;
-          for(var oi=0; oi<spanOtv.length; oi++){
-            var o=spanOtv[oi];
-            var oyBot = o.tip==='vrata' ? 0 : o.sill_m;
-            var oyTop = oyBot + o.visina_m;
-            if(oyBot<=sy1+0.005 && oyTop>=sy2-0.005){ voided=true; break; }
-          }
-          if(voided) continue;
-
-          var isCeiling = isTopRow && Math.abs(sy2-colH) < 0.005;
-          var leftH=sh, rightH=sh;
-          if(isTrapez && isCeiling){
-            leftH = r2(wallTopAt(sx1)-sy1);
-            rightH = r2(wallTopAt(sx2)-sy1);
-          }
-          pieces.push({ x:sx1, w:sw, y:sy1, h:sh, leftH:leftH, rightH:rightH,
-                        isCeiling:isCeiling, colIdx:c, cutW:sw<PLATE_W-0.005, rowCut:sh<PH-0.005 });
+        var oyBot = o.tip==='vrata' ? 0 : o.sill_m;
+        var oyTop = oyBot + o.visina_m;
+        var xOverlap = Math.min(col.x+col.w, o.x_m+o.sirina_m) - Math.max(col.x, o.x_m);
+        var yOverlap = Math.min(rwTop, oyTop) - Math.max(rw.y, oyBot);
+        if(xOverlap<=0.005 || yOverlap<=0.005) continue; // otvor ne dira ovu ćeliju
+        hasOpening = true;
+        if(o.x_m<=col.x+0.005 && o.x_m+o.sirina_m>=col.x+col.w-0.005 && oyBot<=rw.y+0.005 && oyTop>=rwTop-0.005){
+          voided = true; break; // otvor u potpunosti pokriva cijelu ćeliju
         }
       }
+      if(voided) continue;
+      var isCeiling = (ri===rows.length-1);
+      var leftH=rw.h, rightH=rw.h;
+      if(isTrapez && isCeiling){
+        leftH = r2(wallTopAt(col.x)-rw.y);
+        rightH = r2(wallTopAt(col.x+col.w)-rw.y);
+      }
+      pieces.push({ x:col.x, w:col.w, y:rw.y, h:rw.h, leftH:leftH, rightH:rightH,
+                    isCeiling:isCeiling, colIdx:c, cutW:col.w<PLATE_W-0.005, rowCut:rw.cut,
+                    hasOpening:hasOpening });
     }
   }
   return pieces;
@@ -923,8 +884,8 @@ function drawPloce(elId, W, H, PH, offset){
     var lineTop=isTrapez?r2(Yp(wallTopAt(pxc))):pT;
     s+='<line x1="'+r2(lx)+'" y1="'+lineTop+'" x2="'+r2(lx)+'" y2="'+r2(Yp(0))+'" stroke="#5f5e5a" stroke-width="2" stroke-dasharray="3 3" opacity="0.5"/>';
   }
-  // Obris otvora — komadi oko otvora su već izrezani (collectPieces), ovdje
-  // samo ocrtavamo gdje je otvor radi jasnoće (bez otvora ploče tu nema).
+  // Obris otvora — ploča ispod ide preko otvora kao cjelina (nema spoja na
+  // rubu okvira), otvor se u nju izreže kao rupa; ovdje samo ocrtavamo gdje.
   for(var oi=0;oi<S.otvori.length;oi++){
     var ov=S.otvori[oi];
     if(ov.x_m > W+0.001 || ov.x_m+ov.sirina_m < -0.001) continue;
@@ -964,9 +925,8 @@ function calcOptimizacija(){
   var warns=[];
 
   // Collect all needed widths (both layers) — kroz collectPieces koji uvažava
-  // kosinu zida (trapez) i izrezuje dio ploče unutar otvora (vrata/prozori)
+  // kosinu zida (trapez) i preskače ćelije u potpunosti unutar otvora
   var needs=[];
-  var slivers={};
   for(var li=0;li<offsets.length;li++){
     var cols=plateCols(W,offsets[li]);
     // Check edge pieces (rub zida)
@@ -978,16 +938,7 @@ function calcOptimizacija(){
         warns.push('Sloj '+(li+1)+': zadnji komad = '+Math.round(last.w*100)+' cm &lt; 25 cm.');
     }
     var pieces = collectPieces(W, PH, offsets[li]);
-    for(var pi=0;pi<pieces.length;pi++){
-      var p = pieces[pi];
-      needs.push(p.w);
-      if(p.w>0.001 && p.w<0.25){
-        var skey=li+'_'+Math.round(p.x*1000);
-        if(!slivers[skey]){ slivers[skey]=true;
-          warns.push('Sloj '+(li+1)+': uzak komad uz otvor ('+Math.round(p.w*100)+' cm) na '+Math.round(p.x*100)+' cm — razmotri pomak otvora.');
-        }
-      }
-    }
+    for(var pi=0;pi<pieces.length;pi++) needs.push(pieces[pi].w);
   }
 
   // Zid ima dvije strane — udvostručimo potrebe za drugu stranu
@@ -1126,7 +1077,7 @@ function renderRezniPlan(){
         var needCut = p.isCeiling
           ? (p.cutW || p.leftH<PH-0.005 || Math.abs(p.leftH-p.rightH)>0.005)
           : (p.cutW || p.rowCut);
-        if(needCut) rows_t.push({x:p.x,w:p.w,leftH:p.leftH,rightH:p.rightH,layer:li+1});
+        if(needCut || p.hasOpening) rows_t.push({x:p.x,w:p.w,leftH:p.leftH,rightH:p.rightH,layer:li+1,hasOpening:p.hasOpening});
       }
     }
     if(rows_t.length===0){ el.style.display='none'; return; }
@@ -1150,6 +1101,7 @@ function renderRezniPlan(){
       var p=rows_t[i];
       var meta='<div style="font-size:11px;color:#9a988f;margin-top:4px">od: '+fmtCm(p.x)+' cm</div>';
       if(showLayer) meta+='<div style="font-size:11px;color:#9a988f">Sloj '+p.layer+'</div>';
+      if(p.hasOpening) meta+='<div style="font-size:11px;color:#185fa5;font-weight:600">sadrži otvor — izrezati rupu</div>';
       meta+='<div style="font-size:12px;color:#5f5e5a;font-weight:500">2 kom</div>';
       html+='<div style="text-align:center;background:#fff;border:1px solid #e0dfd8;border-radius:6px;padding:8px 10px">'
         +pieceThumbnail(p.w,p.leftH,p.rightH,PH)+meta+'</div>';
@@ -1161,15 +1113,15 @@ function renderRezniPlan(){
     return;
   }
 
-  // Rectangular: group by unique (width × height) → cards with thumbnails
+  // Rectangular: group by unique (width × height, sadrži li otvor) → kartice
   var map={};
   for(var li=0;li<offsets.length;li++){
     var pieces=collectPieces(W,PH,offsets[li]);
     for(var pi=0;pi<pieces.length;pi++){
       var p=pieces[pi];
-      if(!p.cutW && !p.rowCut) continue;
-      var key=fmtCm(p.w)+'x'+fmtCm(p.h);
-      if(!map[key]) map[key]={w:p.w,h:p.h,count:0,inLayers:{}};
+      if(!p.cutW && !p.rowCut && !p.hasOpening) continue;
+      var key=fmtCm(p.w)+'x'+fmtCm(p.h)+(p.hasOpening?'-otv':'');
+      if(!map[key]) map[key]={w:p.w,h:p.h,count:0,inLayers:{},hasOpening:p.hasOpening};
       map[key].count++;
       map[key].inLayers[li+1]=true;
     }
@@ -1187,15 +1139,16 @@ function renderRezniPlan(){
       var ls=Object.keys(p.inLayers).sort().join('+');
       layerBadge='<div style="font-size:11px;color:#9a988f">Sloj '+ls+'</div>';
     }
+    var otvBadge = p.hasOpening ? '<div style="font-size:11px;color:#185fa5;font-weight:600">sadrži otvor — izrezati rupu</div>' : '';
     html+='<div style="text-align:center;background:#fff;border:1px solid #e0dfd8;border-radius:6px;padding:8px 10px">'
       +pieceThumbnail(p.w,p.h,p.h,PH)
-      +layerBadge
+      +layerBadge+otvBadge
       +'<div style="font-size:12px;color:#5f5e5a;font-weight:500;margin-top:4px">'+p.count+' kom</div>'
       +'</div>';
   }
   html+='</div>';
   html+='<p style="font-size:12px;color:#9a988f;margin:8px 0 0">* Uključuje obje strane zida'
-    +(layers===2?', oba sloja':'')+'. Bez 10% rezerve za otpad. Otvori (vrata/prozori) su izuzeti iz potrebne količine.</p>';
+    +(layers===2?', oba sloja':'')+'. Bez 10% rezerve za otpad. Ploča preko otvora ostaje cijela — otvor se u nju izreže kao rupa, bez spoja na rubu okvira.</p>';
   $i('rezni-plan-panel').innerHTML=html;
   el.style.display='';
 }
