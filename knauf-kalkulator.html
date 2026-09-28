@@ -797,6 +797,11 @@ function plateRows(H, PH, colIdx){
 // Stvarno potrebni komadi ploča za jedan sloj (offset), uvažavajući:
 // — kosinu zida (trapez): svaki stupac koristi visinu na svojoj x poziciji, ne max visinu zida
 // — otvore (vrata/prozori): dio ploče unutar otvora se izrezuje i ne troši materijal
+//
+// Otvor se reže i po X (rub otvora) I po Y (visina praga/nadvratnika) — inače
+// komad koji visinom prelazi PREKO otvora (npr. od poda do stropa dok otvor
+// ide samo do 200cm) ostane cijeli i vizualno "prekriva" otvor umjesto da se
+// razdijeli na dio unutar otvora (izbačen) i dio iznad njega (zadržan).
 function collectPieces(W, PH, offset){
   var isTrapez = S.oblik === 'trapez';
   var cols = plateCols(W, offset);
@@ -804,7 +809,7 @@ function collectPieces(W, PH, offset){
   for(var c=0; c<cols.length; c++){
     var col = cols[c];
     var colH = isTrapez ? wallTopAt(col.x) : S.visina_m;
-    var rows = plateRows(colH, PH, c);
+    var baseRows = plateRows(colH, PH, c);
 
     // Podijeli stupac na dijelove po rubovima otvora koji sijeku ovaj stupac
     var xPts = [col.x, r2(col.x+col.w)];
@@ -820,27 +825,54 @@ function collectPieces(W, PH, offset){
     for(var xi=0; xi<ux.length-1; xi++){
       var sx1=ux[xi], sx2=ux[xi+1], sw=r2(sx2-sx1);
       if(sw<0.005) continue;
-      for(var ri=0; ri<rows.length; ri++){
-        var rw = rows[ri];
-        var rwTop = r2(rw.y+rw.h);
-        var voided=false;
-        for(var oi=0; oi<S.otvori.length; oi++){
-          var o=S.otvori[oi];
+
+      // Otvori čiji x-raspon u potpunosti pokriva ovaj (već razrezani) segment
+      var spanOtv=[];
+      for(var oi=0; oi<S.otvori.length; oi++){
+        var o=S.otvori[oi];
+        if(o.x_m<=sx1+0.005 && o.x_m+o.sirina_m>=sx2-0.005) spanOtv.push(o);
+      }
+
+      for(var ri=0; ri<baseRows.length; ri++){
+        var br = baseRows[ri];
+        var brTop = r2(br.y+br.h);
+        var isTopRow = (ri===baseRows.length-1);
+
+        // Y-rubovi otvora (prag/nadvratnik) unutar ovog reda — dodatno režu red
+        var yPts=[br.y, brTop];
+        for(var oi=0; oi<spanOtv.length; oi++){
+          var o=spanOtv[oi];
           var oyBot = o.tip==='vrata' ? 0 : o.sill_m;
           var oyTop = oyBot + o.visina_m;
-          if(o.x_m<=sx1+0.005 && o.x_m+o.sirina_m>=sx2-0.005 && oyBot<=rw.y+0.005 && oyTop>=rwTop-0.005){
-            voided=true; break;
+          if(oyBot>br.y+0.005 && oyBot<brTop-0.005) yPts.push(r2(oyBot));
+          if(oyTop>br.y+0.005 && oyTop<brTop-0.005) yPts.push(r2(oyTop));
+        }
+        yPts.sort(function(a,b){ return a-b; });
+        var uy=[];
+        for(var yi=0; yi<yPts.length; yi++){ if(yi===0 || yPts[yi]-uy[uy.length-1]>0.005) uy.push(yPts[yi]); }
+
+        for(var yi=0; yi<uy.length-1; yi++){
+          var sy1=uy[yi], sy2=uy[yi+1], sh=r2(sy2-sy1);
+          if(sh<0.005) continue;
+
+          var voided=false;
+          for(var oi=0; oi<spanOtv.length; oi++){
+            var o=spanOtv[oi];
+            var oyBot = o.tip==='vrata' ? 0 : o.sill_m;
+            var oyTop = oyBot + o.visina_m;
+            if(oyBot<=sy1+0.005 && oyTop>=sy2-0.005){ voided=true; break; }
           }
+          if(voided) continue;
+
+          var isCeiling = isTopRow && Math.abs(sy2-colH) < 0.005;
+          var leftH=sh, rightH=sh;
+          if(isTrapez && isCeiling){
+            leftH = r2(wallTopAt(sx1)-sy1);
+            rightH = r2(wallTopAt(sx2)-sy1);
+          }
+          pieces.push({ x:sx1, w:sw, y:sy1, h:sh, leftH:leftH, rightH:rightH,
+                        isCeiling:isCeiling, colIdx:c, cutW:sw<PLATE_W-0.005, rowCut:sh<PH-0.005 });
         }
-        if(voided) continue;
-        var isCeiling = (ri===rows.length-1);
-        var leftH=rw.h, rightH=rw.h;
-        if(isTrapez && isCeiling){
-          leftH = r2(wallTopAt(sx1)-rw.y);
-          rightH = r2(wallTopAt(sx2)-rw.y);
-        }
-        pieces.push({ x:sx1, w:sw, y:rw.y, h:rw.h, leftH:leftH, rightH:rightH,
-                      isCeiling:isCeiling, colIdx:c, cutW:sw<PLATE_W-0.005, rowCut:rw.cut });
       }
     }
   }
