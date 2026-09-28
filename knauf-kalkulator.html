@@ -868,8 +868,13 @@ function drawPloce(elId, W, H, PH, offset){
     var fill=isCut?'#fac775':'#b5d4f4';
     var strk=isCut?'#ba7517':'#185fa5';
     s+='<rect x="'+r2(px)+'" y="'+r2(py)+'" width="'+r2(pw)+'" height="'+r2(ph)+'" fill="'+fill+'" stroke="'+strk+'" stroke-width="1"/>';
-    if(pw>30 && ph>14){
-      s+='<text x="'+r2(px+pw/2)+'" y="'+r2(py+ph/2+4)+'" text-anchor="middle" font-size="11" fill="'+(isCut?'#633806':'#0c447c')+'">'+fmtCm(p.w)+'&#215;'+fmtCm(p.h)+'</text>';
+    var txtColor = isCut?'#633806':'#0c447c';
+    // Dimenzije uz rubove (ne na sredini) — ostaju čitljive i kad ploča ima
+    // otvor izrezan u sredini, i staju u puno manje komade nego kombinirani "WxH".
+    if(pw>=24) s+='<text x="'+r2(px+pw/2)+'" y="'+r2(py+11)+'" text-anchor="middle" font-size="10" font-weight="600" fill="'+txtColor+'">'+fmtCm(p.w)+'</text>';
+    if(ph>=24){
+      var hlx=r2(px+8), hly=r2(py+ph/2);
+      s+='<text x="'+hlx+'" y="'+hly+'" text-anchor="middle" font-size="10" font-weight="600" fill="'+txtColor+'" transform="rotate(-90 '+hlx+' '+hly+')">'+fmtCm(p.h)+'</text>';
     }
   }
   if(isTrapez) s+='</g>';
