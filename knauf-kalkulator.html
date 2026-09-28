@@ -857,8 +857,9 @@ function drawPloce(elId, W, H, PH, offset){
       +'</clipPath></defs>';
     s+='<g clip-path="url(#'+clipId+')">';
   }
-  // Komadi identični onima u reznom planu (collectPieces) — otvori su već
-  // izrezani iz potrebe, umjesto da se cijela ploča crta pa prekriva bijelim.
+  // Komadi identični onima u reznom planu (collectPieces) — ploča preko otvora
+  // se i dalje crta kao cijeli komad (bez spoja na rubu okvira, ispravno za
+  // količinu materijala), ali se rupa za sam otvor vizualno izreže ispod.
   var pieces = collectPieces(W, PH, offset);
   for(var pi=0;pi<pieces.length;pi++){
     var p=pieces[pi];
@@ -884,8 +885,8 @@ function drawPloce(elId, W, H, PH, offset){
     var lineTop=isTrapez?r2(Yp(wallTopAt(pxc))):pT;
     s+='<line x1="'+r2(lx)+'" y1="'+lineTop+'" x2="'+r2(lx)+'" y2="'+r2(Yp(0))+'" stroke="#5f5e5a" stroke-width="2" stroke-dasharray="3 3" opacity="0.5"/>';
   }
-  // Obris otvora — ploča ispod ide preko otvora kao cjelina (nema spoja na
-  // rubu okvira), otvor se u nju izreže kao rupa; ovdje samo ocrtavamo gdje.
+  // Izreži rupu za otvor — ploča ispod je cijela (bez spoja na rubu okvira),
+  // ali sam otvor mora ostati vizualno prazan (nema tu gipsa, to je rupa).
   for(var oi=0;oi<S.otvori.length;oi++){
     var ov=S.otvori[oi];
     if(ov.x_m > W+0.001 || ov.x_m+ov.sirina_m < -0.001) continue;
@@ -898,6 +899,7 @@ function drawPloce(elId, W, H, PH, offset){
       oy2=r2(Yp(ov.sill_m+ov.visina_m)); oh2=r2(ov.visina_m*sc);
     }
     if(ow2>0 && oh2>0){
+      s+='<rect x="'+ox2+'" y="'+oy2+'" width="'+ow2+'" height="'+oh2+'" fill="#fff" stroke="none"/>';
       s+='<rect x="'+ox2+'" y="'+oy2+'" width="'+ow2+'" height="'+oh2+'" fill="none" stroke="#2c2c2a" stroke-width="1.5" stroke-dasharray="5 3"/>';
       if(ow2>24 && oh2>14) s+='<text x="'+r2(parseFloat(ox2)+ow2/2)+'" y="'+r2(parseFloat(oy2)+oh2/2+4)+'" text-anchor="middle" font-size="11" fill="#6b6a64">'+(ov.tip==='vrata'?'VRATA':'PROZOR')+'</text>';
     }
