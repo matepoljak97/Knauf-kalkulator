@@ -1128,12 +1128,18 @@ function drawPuzzlePlan(elId, W, H, PH, offset, layerParity, letters){
       var ny1=r2(py+ph-(p.notch.dBottom+p.notch.h)*sc), ny2=r2(py+ph-p.notch.dBottom*sc);
       s+='<rect x="'+nx1+'" y="'+ny1+'" width="'+r2(nx2-nx1)+'" height="'+r2(ny2-ny1)+'" fill="#f4f3ee" stroke="#2c2c2a" stroke-width="1" stroke-dasharray="3 2"/>';
     }
+    // Dimenzije uz rubove — isti stil kao na glavnoj slici ploča.
+    if(pw>=24) s+='<text x="'+r2(px+pw/2)+'" y="'+r2(py+11)+'" text-anchor="middle" font-size="10" font-weight="600" fill="'+txtColor+'">'+fmtCm(p.w)+'</text>';
+    if(ph>=24){
+      var plhx=r2(px+8), plhy=r2(py+ph/2);
+      s+='<text x="'+plhx+'" y="'+plhy+'" text-anchor="middle" font-size="10" font-weight="600" fill="'+txtColor+'" transform="rotate(-90 '+plhx+' '+plhy+')">'+fmtCm(p.h)+'</text>';
+    }
     var lk = letters[pieceKey(p,false)];
-    if(pw>=16 && ph>=16){
-      var lx = p.hasOpening ? r2(px+Math.min(pw*0.22,22)) : r2(px+pw/2);
-      var ly = p.hasOpening ? r2(py+Math.min(ph*0.18,18)) : r2(py+ph/2);
-      if(lk) s+='<text x="'+lx+'" y="'+r2(ly+4)+'" text-anchor="middle" font-size="12" font-weight="700" fill="'+txtColor+'">'+lk+'</text>';
-      else if(pw>=34) s+='<text x="'+lx+'" y="'+r2(ly+4)+'" text-anchor="middle" font-size="9.5" fill="'+txtColor+'">'+fmtCm(p.w)+'&#215;'+fmtCm(p.h)+'</text>';
+    if(lk && pw>=18 && ph>=18){
+      var lx = p.hasOpening ? r2(px+16) : r2(px+pw/2);
+      var ly = p.hasOpening ? r2(py+18) : r2(py+ph/2+5);
+      s+='<circle cx="'+lx+'" cy="'+(ly-5)+'" r="11" fill="#fff" fill-opacity="0.85" stroke="'+strk+'" stroke-width="1.3"/>';
+      s+='<text x="'+lx+'" y="'+(ly-1)+'" text-anchor="middle" font-size="13" font-weight="700" fill="'+txtColor+'">'+lk+'</text>';
     }
     s+='</g>';
   }
