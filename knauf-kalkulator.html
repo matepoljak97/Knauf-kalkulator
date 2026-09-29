@@ -909,7 +909,55 @@ function collectPieces(W, PH, offset, layerIdx){
   return pieces;
 }
 
-function drawPloce(elId, W, H, PH, offset, layerParity){
+// Treba li komad slovnu oznaku — samo oni koji stvarno idu u rezni plan
+// (rezani po širini/visini, ili sadrže otvor); cijele neodrezane ploče ne
+// trebaju oznaku jer se ne pojavljuju u reznom planu.
+function pieceNeedsLabel(p, isTrapez, PH){
+  if(isTrapez){
+    return p.isCeiling
+      ? (p.cutW || p.leftH<PH-0.005 || Math.abs(p.leftH-p.rightH)>0.005)
+      : (p.cutW || p.rowCut);
+  }
+  return p.cutW || p.rowCut || p.hasOpening;
+}
+// Ključ po kojem se komadi grupiraju — isti ključ = isto slovo, isto kao
+// grupiranje u reznom planu (renderRezniPlan).
+function pieceKey(p, isTrapez){
+  return isTrapez
+    ? (fmtCm(p.w)+'x'+fmtCm(p.leftH)+'x'+fmtCm(p.rightH))
+    : (fmtCm(p.w)+'x'+fmtCm(p.h)+(p.hasOpening?'-otv':''));
+}
+// Dodijeli slovo (A, B, C...) svakoj RAZLIČITOJ veličini komada koji ide u
+// rezni plan — isto slovo na skici zida i u reznom planu, da se lakše zna
+// koji odrezani komad ide gdje. Sortirano po površini (najveći prvo), kao
+// i redoslijed kartica u reznom planu.
+function buildPieceLetters(W, PH, offsets){
+  var isTrapez = S.oblik === 'trapez';
+  var groups = {}, order = [];
+  for(var li=0; li<offsets.length; li++){
+    var pieces = collectPieces(W, PH, offsets[li], offsets.length===2 ? li : undefined);
+    for(var pi=0; pi<pieces.length; pi++){
+      var p = pieces[pi];
+      if(!pieceNeedsLabel(p, isTrapez, PH)) continue;
+      var key = pieceKey(p, isTrapez);
+      if(!groups[key]){
+        var avgH = isTrapez ? (p.leftH+p.rightH)/2 : p.h;
+        groups[key] = { area: p.w*avgH };
+        order.push(key);
+      }
+    }
+  }
+  order.sort(function(ka,kb){ return groups[kb].area - groups[ka].area; });
+  var letters={};
+  for(var i=0;i<order.length;i++){
+    var n=i, s='';
+    do { s = String.fromCharCode(65+(n%26)) + s; n = Math.floor(n/26)-1; } while(n>=0);
+    letters[order[i]] = s;
+  }
+  return letters;
+}
+
+function drawPloce(elId, W, H, PH, offset, layerParity, letters){
   var isTrapez=S.oblik==='trapez';
   var HL=isTrapez?S.visina_L_m:H, HD=isTrapez?S.visina_D_m:H;
   var Hmax=isTrapez?Math.max(HL,HD):H;
@@ -944,6 +992,18 @@ function drawPloce(elId, W, H, PH, offset, layerParity){
     if(ph>=24){
       var hlx=r2(px+8), hly=r2(py+ph/2);
       s+='<text x="'+hlx+'" y="'+hly+'" text-anchor="middle" font-size="10" font-weight="600" fill="'+txtColor+'" transform="rotate(-90 '+hlx+' '+hly+')">'+fmtCm(p.h)+'</text>';
+    }
+    // Slovna oznaka — isto slovo kao u reznom planu za ovu veličinu komada.
+    // Kod komada s otvorom stavljena je u gornji lijevi kut (sredina je
+    // rupa), inače u sredinu komada.
+    if(letters){
+      var lk = letters[pieceKey(p, isTrapez)];
+      if(lk && pw>=18 && ph>=18){
+        var lx = p.hasOpening ? r2(px+16) : r2(px+pw/2);
+        var ly = p.hasOpening ? r2(py+18) : r2(py+ph/2+5);
+        s+='<circle cx="'+lx+'" cy="'+(ly-5)+'" r="11" fill="#fff" fill-opacity="0.85" stroke="'+strk+'" stroke-width="1.3"/>';
+        s+='<text x="'+lx+'" y="'+(ly-1)+'" text-anchor="middle" font-size="13" font-weight="700" fill="'+txtColor+'">'+lk+'</text>';
+      }
     }
   }
   if(isTrapez) s+='</g>';
@@ -1110,7 +1170,10 @@ function renderPloce(){
   var firstBoardW=calcFirstBoardW();
   var opt = calcOptimizacija();
 
-  drawPloce('layer1', W, H, PH, firstBoardW, layers===2 ? 0 : undefined);
+  var offsetsForLetters = layers===2 ? [firstBoardW, r2(firstBoardW-S.sirina_ploce_m/2)] : [firstBoardW];
+  var letters = buildPieceLetters(W, PH, offsetsForLetters);
+
+  drawPloce('layer1', W, H, PH, firstBoardW, layers===2 ? 0 : undefined, letters);
 
   var uw = r2(W*2);
   var wool = r2(W*H);
@@ -1136,7 +1199,7 @@ function renderPloce(){
   if(allWarns.length){ wlp.innerHTML=allWarns.map(function(w){return'<li>'+w+'</li>';}).join(''); wbp.style.display=''; }
   else wbp.style.display='none';
 
-  if(layers===2){ drawPloce('layer2', W, H, PH, r2(firstBoardW-S.sirina_ploce_m/2), 1); $i('layer2block').style.display=''; }
+  if(layers===2){ drawPloce('layer2', W, H, PH, r2(firstBoardW-S.sirina_ploce_m/2), 1, letters); $i('layer2block').style.display=''; }
   else $i('layer2block').style.display='none';
 
   renderRezniPlan();
@@ -1197,6 +1260,7 @@ function renderRezniPlan(){
   var layers=S.oblaganje==='dvostruko'?2:1;
   var firstBoardW=calcFirstBoardW();
   var offsets=layers===2?[firstBoardW,r2(firstBoardW-S.sirina_ploce_m/2)]:[firstBoardW];
+  var letters = buildPieceLetters(W, PH, offsets);
   var el=$i('rezni-plan-section');
 
   if(isTrapez){
@@ -1206,10 +1270,8 @@ function renderRezniPlan(){
       var pieces=collectPieces(W,PH,offsets[li],layers===2?li:undefined);
       for(var pi=0;pi<pieces.length;pi++){
         var p=pieces[pi];
-        var needCut = p.isCeiling
-          ? (p.cutW || p.leftH<PH-0.005 || Math.abs(p.leftH-p.rightH)>0.005)
-          : (p.cutW || p.rowCut);
-        if(needCut || p.hasOpening) rows_t.push({x:p.x,w:p.w,leftH:p.leftH,rightH:p.rightH,layer:li+1,hasOpening:p.hasOpening});
+        var needCut = pieceNeedsLabel(p, true, PH);
+        if(needCut || p.hasOpening) rows_t.push({x:p.x,w:p.w,leftH:p.leftH,rightH:p.rightH,layer:li+1,hasOpening:p.hasOpening,letter:letters[pieceKey(p,true)]});
       }
     }
     if(rows_t.length===0){ el.style.display='none'; return; }
@@ -1235,8 +1297,9 @@ function renderRezniPlan(){
       if(showLayer) meta+='<div style="font-size:11px;color:#9a988f">Sloj '+p.layer+'</div>';
       if(p.hasOpening) meta+='<div style="font-size:11px;color:#185fa5;font-weight:600">sadrži otvor — izrezati rupu</div>';
       meta+='<div style="font-size:12px;color:#5f5e5a;font-weight:500">2 kom</div>';
+      var letterBadge = p.letter ? '<div style="width:26px;height:26px;line-height:26px;border-radius:50%;background:#185fa5;color:#fff;font-weight:700;font-size:14px;margin:0 auto 6px">'+p.letter+'</div>' : '';
       html+='<div style="text-align:center;background:#fff;border:1px solid #e0dfd8;border-radius:6px;padding:8px 10px">'
-        +pieceThumbnail(p.w,p.leftH,p.rightH,PH)+meta+'</div>';
+        +letterBadge+pieceThumbnail(p.w,p.leftH,p.rightH,PH)+meta+'</div>';
     }
     html+='</div>';
     html+='<p style="font-size:12px;color:#9a988f;margin:8px 0 0">* 2 kom = obje strane zida'+(showLayer?', po svakom sloju':'')+'. Nagib gornjeg brida prati strop — preporuča se mjerenje na licu mjesta.</p>';
@@ -1253,7 +1316,7 @@ function renderRezniPlan(){
       var p=pieces[pi];
       if(!p.cutW && !p.rowCut && !p.hasOpening) continue;
       var key=fmtCm(p.w)+'x'+fmtCm(p.h)+(p.hasOpening?'-otv':'');
-      if(!map[key]) map[key]={w:p.w,h:p.h,count:0,inLayers:{},hasOpening:p.hasOpening};
+      if(!map[key]) map[key]={w:p.w,h:p.h,count:0,inLayers:{},hasOpening:p.hasOpening,letter:letters[key]};
       map[key].count++;
       map[key].inLayers[li+1]=true;
     }
@@ -1272,8 +1335,9 @@ function renderRezniPlan(){
       layerBadge='<div style="font-size:11px;color:#9a988f">Sloj '+ls+'</div>';
     }
     var otvBadge = p.hasOpening ? '<div style="font-size:11px;color:#185fa5;font-weight:600">sadrži otvor — izrezati rupu</div>' : '';
+    var letterBadge = p.letter ? '<div style="width:26px;height:26px;line-height:26px;border-radius:50%;background:#185fa5;color:#fff;font-weight:700;font-size:14px;margin:0 auto 6px">'+p.letter+'</div>' : '';
     html+='<div style="text-align:center;background:#fff;border:1px solid #e0dfd8;border-radius:6px;padding:8px 10px">'
-      +pieceThumbnail(p.w,p.h,p.h,PH)
+      +letterBadge+pieceThumbnail(p.w,p.h,p.h,PH)
       +layerBadge+otvBadge
       +'<div style="font-size:12px;color:#5f5e5a;font-weight:500;margin-top:4px">'+p.count+' kom</div>'
       +'</div>';
