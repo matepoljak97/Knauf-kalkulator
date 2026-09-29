@@ -1168,49 +1168,41 @@ function drawPuzzlePlan(elId, W, H, PH, offset, layerParity, letters){
   $i(elId).innerHTML=s;
 }
 
-// Nacrtaj JEDNU kupljenu ploču — redoslijed komada koji se iz nje režu
-// (odozdo prema gore, po policama) i sivo označen ostatak koji preostaje.
-// Ovo odgovara na "što s ostatkom" — pokazuje TOČNO gdje on ostaje na
-// svakoj ploči, umjesto samo ukupne brojke otpada.
+// Nacrtaj JEDNU kupljenu ploču — svaki komad na svojoj STVARNOJ poziciji
+// unutar te ploče (isto slovo kao na skici/reznom planu), i sivo označen
+// stvarni ostatak koji preostaje nakon što je iskorišteno sve što je moglo
+// stati. Otpad se prikazuje kao stvarni preostali prostor (packBoards ga
+// već nudi svakom sljedećem komadu prije nego bi se otvorila nova ploča) —
+// ono što ostane sivo genuinely ne stane nijedan preostali komad.
 function drawBoardCutCard(board, PH){
   var bw=S.sirina_ploce_m;
   var cW=150, cH=230, pL=10, pR=10, pT=10, pB=10;
   var sc=Math.min((cW-pL-pR)/bw, (cH-pT-pB)/PH);
   var fw=r2(bw*sc), fh=r2(PH*sc);
   var px=r2(pL+((cW-pL-pR)-fw)/2), py=pT;
+  function bx(x){ return r2(px+x*sc); }
+  function by(y){ return r2(py+fh-y*sc); } // y=0 je dno ploče
   var s='<svg width="'+cW+'" height="'+cH+'" style="display:block;margin:0 auto" xmlns="http://www.w3.org/2000/svg">';
   s+='<rect x="'+px+'" y="'+py+'" width="'+fw+'" height="'+fh+'" fill="#fff" stroke="#2c2c2a" stroke-width="1.5"/>';
-  var yCursor=0;
-  for(var si=0; si<board.shelves.length; si++){
-    var shelf=board.shelves[si];
-    var shY2=r2(py+fh-yCursor*sc);
-    var shY1=r2(py+fh-(yCursor+shelf.h)*sc);
-    var xCursor=0;
-    for(var ii=0; ii<shelf.items.length; ii++){
-      var it=shelf.items[ii];
-      var ix1=r2(px+xCursor*sc), ix2=r2(px+(xCursor+it.w)*sc);
-      var fill=it.full?'#b5d4f4':'#fac775', strk=it.full?'#185fa5':'#ba7517', txt=it.full?'#0c447c':'#633806';
-      s+='<rect x="'+ix1+'" y="'+shY1+'" width="'+r2(ix2-ix1)+'" height="'+r2(shY2-shY1)+'" fill="'+fill+'" stroke="'+strk+'" stroke-width="1"/>';
-      if((ix2-ix1)>13 && (shY2-shY1)>11){
-        var lbl = it.letter || fmtCm(it.w);
-        s+='<text x="'+r2((ix1+ix2)/2)+'" y="'+r2((shY1+shY2)/2+4)+'" text-anchor="middle" font-size="10.5" font-weight="700" fill="'+txt+'">'+lbl+'</text>';
-      }
-      xCursor=r2(xCursor+it.w);
+  for(var ii=0; ii<board.items.length; ii++){
+    var it=board.items[ii];
+    var ix1=bx(it.x), ix2=bx(it.x+it.w), iy2=by(it.y), iy1=by(it.y+it.h);
+    var fill=it.full?'#b5d4f4':'#fac775', strk=it.full?'#185fa5':'#ba7517', txt=it.full?'#0c447c':'#633806';
+    s+='<rect x="'+ix1+'" y="'+iy1+'" width="'+r2(ix2-ix1)+'" height="'+r2(iy2-iy1)+'" fill="'+fill+'" stroke="'+strk+'" stroke-width="1"/>';
+    if((ix2-ix1)>13 && (iy2-iy1)>11){
+      var lbl = it.letter || fmtCm(it.w);
+      s+='<text x="'+r2((ix1+ix2)/2)+'" y="'+r2((iy1+iy2)/2+4)+'" text-anchor="middle" font-size="10.5" font-weight="700" fill="'+txt+'">'+lbl+'</text>';
     }
-    if(shelf.remW>0.005){
-      var ox1=r2(px+xCursor*sc), ox2=r2(px+fw);
-      s+='<rect x="'+ox1+'" y="'+shY1+'" width="'+r2(ox2-ox1)+'" height="'+r2(shY2-shY1)+'" fill="#e3e1d8" stroke="#9a988f" stroke-width="1" stroke-dasharray="3 2"/>';
-      if((ox2-ox1)>24 && (shY2-shY1)>18){
-        s+='<text x="'+r2((ox1+ox2)/2)+'" y="'+r2((shY1+shY2)/2-1)+'" text-anchor="middle" font-size="8" fill="#8a8879">ostatak</text>';
-        s+='<text x="'+r2((ox1+ox2)/2)+'" y="'+r2((shY1+shY2)/2+10)+'" text-anchor="middle" font-size="9" font-weight="600" fill="#8a8879">'+fmtCm(shelf.remW)+'</text>';
-      }
-    }
-    yCursor=r2(yCursor+shelf.h);
   }
-  if(board.remH>0.005){
-    var ty1=py, ty2=r2(py+fh-yCursor*sc);
-    s+='<rect x="'+px+'" y="'+ty1+'" width="'+fw+'" height="'+r2(ty2-ty1)+'" fill="#e3e1d8" stroke="#9a988f" stroke-width="1" stroke-dasharray="3 2"/>';
-    if((ty2-ty1)>16) s+='<text x="'+r2(px+fw/2)+'" y="'+r2((ty1+ty2)/2+3)+'" text-anchor="middle" font-size="9" font-weight="600" fill="#8a8879">ostatak '+fmtCm(board.remH)+'</text>';
+  for(var fi=0; fi<board.free.length; fi++){
+    var r=board.free[fi];
+    if(r.w<0.005 || r.h<0.005) continue;
+    var ox1=bx(r.x), ox2=bx(r.x+r.w), oy2=by(r.y), oy1=by(r.y+r.h);
+    s+='<rect x="'+ox1+'" y="'+oy1+'" width="'+r2(ox2-ox1)+'" height="'+r2(oy2-oy1)+'" fill="#e3e1d8" stroke="#9a988f" stroke-width="1" stroke-dasharray="3 2"/>';
+    if((ox2-ox1)>24 && (oy2-oy1)>18){
+      s+='<text x="'+r2((ox1+ox2)/2)+'" y="'+r2((oy1+oy2)/2-1)+'" text-anchor="middle" font-size="8" fill="#8a8879">ostatak</text>';
+      s+='<text x="'+r2((ox1+ox2)/2)+'" y="'+r2((oy1+oy2)/2+10)+'" text-anchor="middle" font-size="9" font-weight="600" fill="#8a8879">'+fmtCm(r.w)+'&#215;'+fmtCm(r.h)+'</text>';
+    }
   }
   s+='</svg>';
   return s;
@@ -1290,61 +1282,54 @@ function packBoards(needs, PH){
   // Zid ima dvije strane — udvostručimo potrebe za drugu stranu
   needs = needs.concat(needs.map(function(n){ return {w:n.w, h:n.h, full:n.full, letter:n.letter}; }));
 
-  // Sort najviši prvo (pa najširi) — bolje popunjavanje polica
+  // Sort najviši prvo (pa najširi) — bolje popunjavanje
   needs.sort(function(a,b){ return b.h-a.h || b.w-a.w; });
 
-  // 2D "police" raspoređivanje (ne samo po širini kao prije): svaka otvorena
-  // ploča ima police (vodoravne trake preostale visine). Komad ide na
-  // najbolju postojeću policu ISTE visine gdje stane širinom (iskorištava
-  // preostalu ŠIRINU police) — polica mora imati TOČNO istu visinu kao komad,
-  // inače bi niži komad "sjeo" u policu za viši i sakrio izgubljeni prostor
-  // iznad sebe koji se nigdje ne bi zabilježio kao otpad. Ako nema, otvara se
-  // nova polica na postojećoj ploči ako ima preostale VISINE; tek ako ništa
-  // ne odgovara, kupuje se nova ploča. Ovo iz jedne ploče stvarno izvuče što
-  // više komada — i po širini i po visini — umjesto da svaki "red" traži
-  // svoju ploču.
+  // Pravi 2D raspored slobodnih pravokutnika ("giljotinsko" rezanje), umjesto
+  // starog pristupa gdje je komad mogao ući samo u policu TOČNO iste visine.
+  // Svaka ploča počinje kao JEDAN slobodan pravokutnik (cijela ploča). Svaki
+  // komad ide u NAJBOLJI slobodan pravokutnik (bilo koje ploče) u koji stane
+  // — najmanje ostatka nakon smještaja ("best area fit") — pa se preostali
+  // L-oblik reže na dva nova manja slobodna pravokutnika koji su OPET
+  // ponuđeni sljedećim komadima. Ovo znači da se ostatak od jednog komada
+  // stvarno može iskoristiti za bilo koji SLJEDEĆI komad koji u njega stane,
+  // ne samo za komad iste visine — manje ostatka, manje kupljenih ploča.
   var pw=S.sirina_ploce_m;
-  var boards=[], plates=0;
+  var boards=[];
   for(var i=0;i<needs.length;i++){
-    var n=needs[i], placed=false;
-    var bBoard=-1, bShelf=-1, bRemW=Infinity;
+    var n=needs[i];
+    var bestBoard=-1, bestFree=-1, bestWaste=Infinity;
     for(var bi=0;bi<boards.length;bi++){
-      var board=boards[bi];
-      for(var si=0;si<board.shelves.length;si++){
-        var shelf=board.shelves[si];
-        if(shelf.remW>=n.w-0.001 && Math.abs(shelf.h-n.h)<0.005 && shelf.remW-n.w<bRemW){
-          bRemW=shelf.remW-n.w; bBoard=bi; bShelf=si;
+      var free=boards[bi].free;
+      for(var fi=0;fi<free.length;fi++){
+        var r=free[fi];
+        if(r.w>=n.w-0.001 && r.h>=n.h-0.001){
+          var waste=r.w*r.h-n.w*n.h;
+          if(waste<bestWaste){ bestWaste=waste; bestBoard=bi; bestFree=fi; }
         }
       }
     }
-    if(bBoard>=0){
-      var sh=boards[bBoard].shelves[bShelf];
-      sh.remW=r2(sh.remW-n.w);
-      sh.items.push(n);
-      placed=true;
-    } else {
-      var bBoard2=-1, bRemH=Infinity;
-      for(var bi2=0;bi2<boards.length;bi2++){
-        if(boards[bi2].remH>=n.h-0.001 && boards[bi2].remH-n.h<bRemH){ bRemH=boards[bi2].remH-n.h; bBoard2=bi2; }
-      }
-      if(bBoard2>=0){
-        boards[bBoard2].shelves.push({h:n.h, remW:r2(pw-n.w), items:[n]});
-        boards[bBoard2].remH=r2(boards[bBoard2].remH-n.h);
-        placed=true;
-      }
+    if(bestBoard<0){
+      boards.push({ free:[{x:0,y:0,w:pw,h:PH}], items:[] });
+      bestBoard=boards.length-1; bestFree=0;
     }
-    if(!placed){
-      plates++;
-      boards.push({ shelves:[{h:n.h, remW:r2(pw-n.w), items:[n]}], remH:r2(PH-n.h) });
-    }
+    var board=boards[bestBoard];
+    var r=board.free[bestFree];
+    board.free.splice(bestFree,1);
+    board.items.push({ x:r.x, y:r.y, w:n.w, h:n.h, full:n.full, letter:n.letter });
+    // Giljotinski rez preostalog prostora (L-oblik oko smještenog komada) na
+    // dva nova slobodna pravokutnika: traku desno (ista visina kao komad) i
+    // traku iznad (puna širina originalnog pravokutnika).
+    var rightW=r2(r.w-n.w), topH=r2(r.h-n.h);
+    if(rightW>0.004) board.free.push({x:r2(r.x+n.w), y:r.y, w:rightW, h:n.h});
+    if(topH>0.004) board.free.push({x:r.x, y:r2(r.y+n.h), w:r.w, h:topH});
   }
   var otpad=0;
-  for(var bi3=0;bi3<boards.length;bi3++){
-    var b=boards[bi3];
-    for(var si3=0;si3<b.shelves.length;si3++) otpad += b.shelves[si3].remW*b.shelves[si3].h;
-    otpad += b.remH*pw;
+  for(var bi2=0;bi2<boards.length;bi2++){
+    var fr=boards[bi2].free;
+    for(var fi2=0;fi2<fr.length;fi2++) otpad += fr[fi2].w*fr[fi2].h;
   }
-  return { plates:plates, rezovi:needs.length, otpad:r2(otpad), boards:boards };
+  return { plates:boards.length, rezovi:needs.length, otpad:r2(otpad), boards:boards };
 }
 
 function renderPloce(){
