@@ -1100,6 +1100,47 @@ function drawPloce(elId, W, H, PH, offset, layerParity, letters){
   $i(elId).innerHTML=s;
 }
 
+// "Puzzle" prikaz rasporeda — svaki komad je nacrtan TOČNO tamo gdje ide na
+// zidu (ista pozicija/veličina kao drawPloce), ali svaki je malo skupljen
+// prema vlastitom središtu (SVG transform), pa se vidi razmak između njih —
+// kao slagalica spremna za slaganje, samo još ne posložena. Radi samo za
+// pravokutan zid (trapez ima kosi gornji rub koji ovaj jednostavni prikaz
+// ne prati — ostaje na postojećem prikazu kartica).
+function drawPuzzlePlan(elId, W, H, PH, offset, layerParity, letters){
+  var mxW=820, pL=8, pR=8, pT=8, pB=8;
+  var sc=(mxW-pL-pR)/W;
+  var vbH=r2(H*sc+pT+pB);
+  function Xp(m){ return pL+m*sc; }
+  function Yp(m){ return pT+(H-m)*sc; }
+  var pieces = collectPieces(W, PH, offset, layerParity);
+  var SHRINK = 0.87; // koliko se svaki komad skupi prema svom središtu (razmak "puzzle" efekta)
+  var s='<svg width="100%" viewBox="0 0 '+mxW+' '+vbH+'" xmlns="http://www.w3.org/2000/svg" style="max-width:'+mxW+'px;background:#f4f3ee;border-radius:6px">';
+  for(var pi=0;pi<pieces.length;pi++){
+    var p=pieces[pi];
+    var isCut = p.cutW || p.rowCut;
+    var px=Xp(p.x), py=Yp(p.y+p.h), pw=p.w*sc, ph=p.h*sc;
+    var cx=r2(px+pw/2), cy=r2(py+ph/2);
+    var fill=isCut?'#fac775':'#b5d4f4', strk=isCut?'#ba7517':'#185fa5', txtColor=isCut?'#633806':'#0c447c';
+    s+='<g transform="translate('+cx+','+cy+') scale('+SHRINK+') translate('+(-cx)+','+(-cy)+')">';
+    s+='<rect x="'+r2(px)+'" y="'+r2(py)+'" width="'+r2(pw)+'" height="'+r2(ph)+'" fill="'+fill+'" stroke="'+strk+'" stroke-width="1.5" rx="2"/>';
+    if(p.hasOpening && p.notch){
+      var nx1=r2(px+p.notch.dLeft*sc), nx2=r2(px+(p.notch.dLeft+p.notch.w)*sc);
+      var ny1=r2(py+ph-(p.notch.dBottom+p.notch.h)*sc), ny2=r2(py+ph-p.notch.dBottom*sc);
+      s+='<rect x="'+nx1+'" y="'+ny1+'" width="'+r2(nx2-nx1)+'" height="'+r2(ny2-ny1)+'" fill="#f4f3ee" stroke="#2c2c2a" stroke-width="1" stroke-dasharray="3 2"/>';
+    }
+    var lk = letters[pieceKey(p,false)];
+    if(pw>=16 && ph>=16){
+      var lx = p.hasOpening ? r2(px+Math.min(pw*0.22,22)) : r2(px+pw/2);
+      var ly = p.hasOpening ? r2(py+Math.min(ph*0.18,18)) : r2(py+ph/2);
+      if(lk) s+='<text x="'+lx+'" y="'+r2(ly+4)+'" text-anchor="middle" font-size="12" font-weight="700" fill="'+txtColor+'">'+lk+'</text>';
+      else if(pw>=34) s+='<text x="'+lx+'" y="'+r2(ly+4)+'" text-anchor="middle" font-size="9.5" fill="'+txtColor+'">'+fmtCm(p.w)+'&#215;'+fmtCm(p.h)+'</text>';
+    }
+    s+='</g>';
+  }
+  s+='</svg>';
+  $i(elId).innerHTML=s;
+}
+
 // ── CUTTING OPTIMISATION (spec-krojenje-optimizacija.md) ─────
 function calcOptimizacija(){
   var W=S.duzina_m, PH=S.visina_ploce_m;
@@ -1380,6 +1421,7 @@ function renderRezniPlan(){
   }
 
   // Rectangular: group by unique (width × height, sadrži li otvor) → kartice
+  var H=S.visina_m;
   var map={};
   for(var li=0;li<offsets.length;li++){
     var pieces=collectPieces(W,PH,offsets[li],layers===2?li:undefined);
@@ -1397,7 +1439,12 @@ function renderRezniPlan(){
   if(arr.length===0){ el.style.display='none'; return; }
   arr.sort(function(a,b){ return b.w*b.h-a.w*a.h; });
 
-  var html='<div style="display:flex;flex-wrap:wrap;gap:10px;padding:4px 0">';
+  // "Puzzle" prikaz — svi komadi (puni i rezani) na svojoj stvarnoj poziciji,
+  // malo razmaknuti kao slagalica spremna za slaganje, prije popisa kartica.
+  var html='<p class="layer-title" style="font-size:13px;margin-bottom:6px">Raspored slaganja <span class="layer-note">— svaka ploča na svom mjestu, razmaknuto radi preglednosti</span></p>';
+  html+='<div class="panel" style="margin-bottom:10px"><div id="puzzle-l1"></div>'+(layers===2?'<p class="layer-note" style="margin:8px 0 4px">Sloj 2</p><div id="puzzle-l2"></div>':'')+'</div>';
+
+  html+='<div style="display:flex;flex-wrap:wrap;gap:10px;padding:4px 0">';
   for(var i=0;i<arr.length;i++){
     var p=arr[i];
     var layerBadge='';
@@ -1417,6 +1464,8 @@ function renderRezniPlan(){
   html+='<p style="font-size:12px;color:#9a988f;margin:8px 0 0">* Uključuje obje strane zida'
     +(layers===2?', oba sloja':'')+'. Bez 10% rezerve za otpad. Ploča preko otvora ostaje cijela — otvor se u nju izreže kao rupa, bez spoja na rubu okvira.</p>';
   $i('rezni-plan-panel').innerHTML=html;
+  drawPuzzlePlan('puzzle-l1', W, H, PH, offsets[0], layers===2?0:undefined, letters);
+  if(layers===2) drawPuzzlePlan('puzzle-l2', W, H, PH, offsets[1], 1, letters);
   el.style.display='';
 }
 
