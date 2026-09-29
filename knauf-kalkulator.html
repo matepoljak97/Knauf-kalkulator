@@ -177,6 +177,7 @@ h2 { font-size: 16px; font-weight: 600; margin: 0 0 8px; }
       <div class="legend-item"><span class="legend-box" style="background:#b5d4f4;border:1px solid #185fa5"></span>Cijela ploča</div>
       <div class="legend-item"><span class="legend-box" style="background:#fac775;border:1px solid #ba7517"></span>Rezana ploča</div>
       <div class="legend-item"><span style="border-top:2px dashed #5f5e5a;height:0;width:14px;vertical-align:3px;display:inline-block"></span>&nbsp;Profil</div>
+      <div class="legend-item"><span style="display:inline-block;width:14px;height:14px;position:relative"><span style="position:absolute;left:1px;top:6px;width:12px;border-top:2px solid #c0392b;transform:rotate(-45deg);transform-origin:left"></span></span>Dijagonalno ojačanje kuta (traka/mrežica)</div>
     </div>
     <div id="rezni-plan-section" style="display:none">
       <p class="layer-title">Rezni plan <span class="layer-note">— komadi za predrezanje</span></p>
@@ -907,6 +908,19 @@ function drawPloce(elId, W, H, PH, offset){
       s+='<rect x="'+ox2+'" y="'+oy2+'" width="'+ow2+'" height="'+oh2+'" fill="#fff" stroke="none"/>';
       s+='<rect x="'+ox2+'" y="'+oy2+'" width="'+ow2+'" height="'+oh2+'" fill="none" stroke="#2c2c2a" stroke-width="1.5" stroke-dasharray="5 3"/>';
       if(ow2>24 && oh2>14) s+='<text x="'+r2(parseFloat(ox2)+ow2/2)+'" y="'+r2(parseFloat(oy2)+oh2/2+4)+'" text-anchor="middle" font-size="11" fill="#6b6a64">'+(ov.tip==='vrata'?'VRATA':'PROZOR')+'</text>';
+      // Dijagonalno ojačanje kutova (traka/mrežica preko dijagonale) — standardna
+      // mjera protiv pucanja gleta na uglovima otvora, mjestu najveceg naprezanja.
+      // Vrata nemaju donje uglove u ploči (otvor ide do poda).
+      var oxN=parseFloat(ox2), oyN=parseFloat(oy2), dl=Math.min(11, ow2/2-1, oh2/2-1);
+      if(dl>3){
+        var corners = ov.tip==='vrata'
+          ? [[oxN,oyN],[oxN+ow2,oyN]]
+          : [[oxN,oyN],[oxN+ow2,oyN],[oxN,oyN+oh2],[oxN+ow2,oyN+oh2]];
+        for(var ci=0;ci<corners.length;ci++){
+          var cx=corners[ci][0], cy=corners[ci][1];
+          s+='<line x1="'+r2(cx-dl)+'" y1="'+r2(cy-dl)+'" x2="'+r2(cx+dl)+'" y2="'+r2(cy+dl)+'" stroke="#c0392b" stroke-width="2.5"/>';
+        }
+      }
     }
   }
   if(isTrapez){
@@ -943,6 +957,19 @@ function calcOptimizacija(){
         warns.push('Sloj '+(li+1)+': prvi komad = '+Math.round(first.w*100)+' cm &lt; 25 cm.');
       if(cols.length>1 && last.w < 0.25 && last.w > 0.001)
         warns.push('Sloj '+(li+1)+': zadnji komad = '+Math.round(last.w*100)+' cm &lt; 25 cm.');
+    }
+    // Spoj ploča (fuga) preblizu ugla otvora je sklon pucanju čak i kad nije
+    // baš na rubu okvira — raster ploča ide neovisno o otvoru, pa provjeravamo
+    // je li se slučajno neki unutarnji spoj približio (unutar 15cm) uglu.
+    var JOINT_MIN_GAP = 0.15;
+    for(var jc=1; jc<cols.length; jc++){
+      var jx = cols[jc].x;
+      for(var oi=0; oi<S.otvori.length; oi++){
+        var o=S.otvori[oi];
+        var d = Math.min(Math.abs(jx-o.x_m), Math.abs(jx-(o.x_m+o.sirina_m)));
+        if(d < JOINT_MIN_GAP)
+          warns.push('Sloj '+(li+1)+': spoj ploča na '+Math.round(jx*100)+' cm je samo '+Math.round(d*100)+' cm od ugla otvora '+(oi+1)+' — sklono pucanju, razmotri pomak otvora ili ploče.');
+      }
     }
     var pieces = collectPieces(W, PH, offsets[li]);
     for(var pi=0;pi<pieces.length;pi++) needs.push(pieces[pi].w);
