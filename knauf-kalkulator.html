@@ -84,9 +84,12 @@ h2 { font-size: 16px; font-weight: 600; margin: 0 0 8px; }
     </button>
   </div>
 
-  <!-- Dim sketch (interactive wall outline) -->
-  <div class="dim-sketch-panel">
-    <div id="dim-sketch-wrap"></div>
+  <!-- Dim sketch (interactive wall outline) + ploča sketch -->
+  <div class="dim-sketch-panel" style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
+    <div id="dim-sketch-wrap" style="flex:1 1 300px;min-width:220px"></div>
+    <div style="flex:0 0 auto;border-left:1px solid #e3e1d8;padding-left:14px">
+      <div id="plate-sketch-wrap"></div>
+    </div>
     <input id="dim-inp" type="number" min="10" step="1" onkeydown="dimKeydown(event)" onblur="commitDim()">
   </div>
 
@@ -116,17 +119,18 @@ h2 { font-size: 16px; font-weight: 600; margin: 0 0 8px; }
         <option value="4.5">4,5 m</option>
       </select>
     </div>
-    <div class="field"><label>Visina ploče</label>
+    <div class="field"><label>Visina ploče (cm)</label>
       <select id="i-vispl">
         <option value="200" selected>200 cm</option>
         <option value="250">250 cm</option>
         <option value="300">300 cm</option>
       </select>
     </div>
+    <div class="field"><label>Širina ploče (cm)</label><input type="number" id="i-sirpl" value="125" min="60" max="150" step="0.5"></div>
     <div class="field"><label>CW razmak</label>
       <select id="i-razmak">
-        <option value="62.5" selected>62,5 cm</option>
-        <option value="41.7">41,7 cm</option>
+        <option value="half" selected>Pola širine ploče</option>
+        <option value="third">Trećina širine ploče</option>
       </select>
     </div>
   </div>
@@ -170,7 +174,7 @@ h2 { font-size: 16px; font-weight: 600; margin: 0 0 8px; }
     <p class="layer-title">Sloj 1</p>
     <div class="panel" id="layer1"></div>
     <div id="layer2block" style="display:none">
-      <p class="layer-title">Sloj 2 <span class="layer-note">— fuge pomaknute za 62,5 cm</span></p>
+      <p class="layer-title">Sloj 2 <span class="layer-note">— fuge pomaknute za pola širine ploče</span></p>
       <div class="panel" id="layer2"></div>
     </div>
     <div class="legend" style="margin-bottom:14px">
@@ -190,8 +194,6 @@ h2 { font-size: 16px; font-weight: 600; margin: 0 0 8px; }
 
 <script>
 // ── CONSTANTS ────────────────────────────────────────────────
-var PLATE_W  = 1.25;   // m
-var SPACING  = 0.625;  // m  (raster ploča = pola ploče)
 var MIN_KOMAD = 0.30;  // m
 
 var COLORS = ['#e74c3c','#e67e22','#9b59b6','#1abc9c','#e91e63'];
@@ -202,7 +204,7 @@ var S = {
   duzina_m: 4.0, visina_m: 2.75,
   oblik: 'pravokutan', visina_L_m: 2.75, visina_D_m: 2.25,
   tip_profila: 'CW75', oblaganje: 'jednostruko',
-  duzina_profila_m: 4, visina_ploce_m: 2.0,
+  duzina_profila_m: 4, visina_ploce_m: 2.0, sirina_ploce_m: 1.25,
   otvori: []
 };
 var _oid = 0;
@@ -233,16 +235,17 @@ function readInputs(){
   S.oblaganje        = $i('i-oblaganje').value;
   S.duzina_profila_m = parseFloat($i('i-durprof').value);
   S.visina_ploce_m   = (parseFloat($i('i-vispl').value) || 200) / 100;
+  S.sirina_ploce_m   = (parseFloat($i('i-sirpl').value) || 125) / 100;
   S.cw_razmak        = $i('i-razmak').value;
 }
 
 function calcRaster(){
-  return S.cw_razmak === '41.7' ? 0.417 : 0.625;
+  return S.cw_razmak === 'third' ? r2(S.sirina_ploce_m/3) : r2(S.sirina_ploce_m/2);
 }
 
 function calcFirstOffset(){
-  var DEF = 0.575;
   var raster = calcRaster();
+  var DEF = r2(raster - 0.05); // 5cm skraćenje ruba ploče (ulegnuti rub)
   var W = S.duzina_m;
   if(W <= DEF + 0.001) return W / 2;
   // Broj CW intervala od prvog profila do desnog zida (s defaultom 57.5cm)
@@ -281,18 +284,31 @@ function setOblik(oblik){
 var _editingDim = null;
 
 function drawDimSketch(){
-  var skW=420, skH=110, pL=64, pR=64, pT=18, pB=28;
-  var drawW=skW-pL-pR, drawH=skH-pT-pB;
+  var skW=420, pL=64, pR=64, pT=18, pB=28;
+  var maxDrawW=skW-pL-pR, maxDrawH=170;
   var visinL = S.oblik==='trapez' ? S.visina_L_m : S.visina_m;
   var visinR = S.oblik==='trapez' ? S.visina_D_m : S.visina_m;
   var maxH   = Math.max(visinL, visinR);
-  var scX = drawW / S.duzina_m;
-  var scY = drawH / maxH;
-  function X(m){ return r2(pL + m*scX); }
-  function Y(m){ return r2(pT + (maxH-m)*scY); }
+  // Ista razmjera za X i Y (stvarni omjer dužina:visina), uklopljena u
+  // raspoloživi prostor — ne razvučen/spljošten kao prije.
+  var sc = Math.min(maxDrawW / S.duzina_m, maxDrawH / maxH);
+  var drawW = S.duzina_m*sc, drawH = maxH*sc;
+  var offX = pL + (maxDrawW-drawW)/2; // centriraj vodoravno ako je visina ograničavajuća
+  var skH = drawH + pT + pB;
+  function X(m){ return r2(offX + m*sc); }
+  function Y(m){ return r2(pT + (maxH-m)*sc); }
   var pts = X(0)+','+Y(0)+' '+X(S.duzina_m)+','+Y(0)+' '+X(S.duzina_m)+','+Y(visinR)+' '+X(0)+','+Y(visinL);
   var s = '<svg width="100%" viewBox="0 0 '+skW+' '+skH+'" xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:'+skW+'px">';
   s += '<polygon points="'+pts+'" fill="#ede9e0" stroke="#2c2c2a" stroke-width="1.5"/>';
+  // Otvori (vrata/prozori) — stvarna pozicija/veličina, radi realnog dojma zida
+  for(var i=0;i<S.otvori.length;i++){
+    var o=S.otvori[i], col=otvorColor(i);
+    var oyBot = o.tip==='vrata' ? 0 : o.sill_m;
+    var ox1=Math.max(0,o.x_m), ox2=Math.min(S.duzina_m,o.x_m+o.sirina_m);
+    if(ox2<=ox1) continue;
+    s += '<rect x="'+X(ox1)+'" y="'+Y(oyBot+o.visina_m)+'" width="'+r2(X(ox2)-X(ox1))+'" height="'+r2(Y(oyBot)-Y(oyBot+o.visina_m))+
+         '" fill="'+col+'" fill-opacity="0.3" stroke="'+col+'" stroke-width="1.5"/>';
+  }
   // Duzina (bottom)
   s += '<text x="'+X(S.duzina_m/2)+'" y="'+(Y(0)+17)+'" text-anchor="middle" font-size="12" fill="#185fa5" font-weight="600" style="cursor:pointer;user-select:none" onclick="editDim(\'duzina\',event)">'+Math.round(S.duzina_m*100)+' cm</text>';
   // Visina lijevo
@@ -304,6 +320,34 @@ function drawDimSketch(){
   }
   s += '</svg>';
   $i('dim-sketch-wrap').innerHTML = s;
+}
+
+// Skica jedne gips ploče (širina × visina) — čisto informativna, koristi
+// trenutno odabranu širinu/visinu ploče iz gornjih polja.
+function drawPlateSketch(){
+  var w=S.sirina_ploce_m, h=S.visina_ploce_m;
+  var cW=150, cH=170, pL=16, pR=34, pT=12, pB=30;
+  var sc=Math.min((cW-pL-pR)/w, (cH-pT-pB)/h);
+  var fw=r2(w*sc), fh=r2(h*sc);
+  var px=r2(pL+((cW-pL-pR)-fw)/2), py=pT;
+  var s='<svg width="'+cW+'" height="'+cH+'" xmlns="http://www.w3.org/2000/svg" style="display:block">';
+  s+='<rect x="'+px+'" y="'+py+'" width="'+fw+'" height="'+fh+'" fill="#b5d4f4" stroke="#185fa5" stroke-width="1.5"/>';
+  // Širina — donji rub
+  var dwY=r2(py+fh+10);
+  s+='<line x1="'+px+'" y1="'+dwY+'" x2="'+r2(px+fw)+'" y2="'+dwY+'" stroke="#9a988f" stroke-width="1"/>';
+  s+='<line x1="'+px+'" y1="'+r2(dwY-3)+'" x2="'+px+'" y2="'+r2(dwY+3)+'" stroke="#9a988f" stroke-width="1"/>';
+  s+='<line x1="'+r2(px+fw)+'" y1="'+r2(dwY-3)+'" x2="'+r2(px+fw)+'" y2="'+r2(dwY+3)+'" stroke="#9a988f" stroke-width="1"/>';
+  s+='<text x="'+r2(px+fw/2)+'" y="'+r2(dwY+13)+'" text-anchor="middle" font-size="11" font-weight="600" fill="#0c447c">'+fmtCm(w)+' cm</text>';
+  // Visina — desni rub, okomito
+  var dhX=r2(px+fw+9);
+  s+='<line x1="'+dhX+'" y1="'+py+'" x2="'+dhX+'" y2="'+r2(py+fh)+'" stroke="#9a988f" stroke-width="1"/>';
+  s+='<line x1="'+r2(dhX-3)+'" y1="'+py+'" x2="'+r2(dhX+3)+'" y2="'+py+'" stroke="#9a988f" stroke-width="1"/>';
+  s+='<line x1="'+r2(dhX-3)+'" y1="'+r2(py+fh)+'" x2="'+r2(dhX+3)+'" y2="'+r2(py+fh)+'" stroke="#9a988f" stroke-width="1"/>';
+  var hcx=r2(dhX+11), hcy=r2(py+fh/2);
+  s+='<text x="'+hcx+'" y="'+hcy+'" text-anchor="middle" font-size="11" font-weight="600" fill="#0c447c" transform="rotate(-90 '+hcx+' '+hcy+')">'+fmtCm(h)+' cm</text>';
+  s+='<text x="'+(cW/2)+'" y="'+(cH-6)+'" text-anchor="middle" font-size="10" fill="#9a988f">1 gips ploča</text>';
+  s+='</svg>';
+  $i('plate-sketch-wrap').innerHTML=s;
 }
 
 function editDim(dim, event){
@@ -778,9 +822,10 @@ function calcAndShowProfili(){
 
 // ── PLATE LAYOUT ─────────────────────────────────────────────
 function plateCols(W, offset){
+  var pw=S.sirina_ploce_m;
   var cols=[], x=0;
   if(offset>0){ cols.push({x:0, w:Math.min(offset,W)}); x=offset; }
-  while(x < W-0.001){ cols.push({x:x, w:Math.min(PLATE_W,W-x)}); x+=PLATE_W; }
+  while(x < W-0.001){ cols.push({x:x, w:Math.min(pw,W-x)}); x+=pw; }
   return cols;
 }
 // shift pomiče TOČKU reza (ne mijenja izmjenu po stupcu) — koristi se da sloj
@@ -850,7 +895,7 @@ function collectPieces(W, PH, offset, layerIdx){
         rightH = r2(wallTopAt(col.x+col.w)-rw.y);
       }
       pieces.push({ x:col.x, w:col.w, y:rw.y, h:rw.h, leftH:leftH, rightH:rightH,
-                    isCeiling:isCeiling, cutW:col.w<PLATE_W-0.005, rowCut:rw.cut,
+                    isCeiling:isCeiling, cutW:col.w<S.sirina_ploce_m-0.005, rowCut:rw.cut,
                     hasOpening:hasOpening });
     }
   }
@@ -955,10 +1000,10 @@ function calcOptimizacija(){
   var W=S.duzina_m, PH=S.visina_ploce_m;
   var layers = S.oblaganje==='dvostruko' ? 2 : 1;
   var firstBoardW=calcFirstBoardW();
-  // Sloj 2 pomaknut za pola ploče (SPACING) u odnosu na sloj 1 — oduzimamo, ne
-  // zbrajamo, jer prva ploča sloja 1 već sadrži puni raster (firstOff+raster);
-  // zbrajanje bi dalo prvu ploču širu od 125cm, što fizički ne postoji.
-  var offsets = layers===2 ? [firstBoardW, r2(firstBoardW-SPACING)] : [firstBoardW];
+  // Sloj 2 pomaknut za pola ploče u odnosu na sloj 1 — oduzimamo, ne zbrajamo,
+  // jer prva ploča sloja 1 već sadrži puni raster (firstOff+raster); zbrajanje
+  // bi dalo prvu ploču širu od cijele ploče, što fizički ne postoji.
+  var offsets = layers===2 ? [firstBoardW, r2(firstBoardW-S.sirina_ploce_m/2)] : [firstBoardW];
   var warns=[];
 
   // Collect all needed widths (both layers) — kroz collectPieces koji uvažava
@@ -1012,7 +1057,7 @@ function calcOptimizacija(){
       if(bestRem>=MIN_KOMAD) bin.push(r2(bestRem));
     } else {
       plates++;
-      var cut=r2(PLATE_W-need);
+      var cut=r2(S.sirina_ploce_m-need);
       if(cut>=MIN_KOMAD) bin.push(cut);
     }
   }
@@ -1035,7 +1080,8 @@ function renderPloce(){
   var wool = r2(W*H);
 
   var rasterP = calcRaster();
-  var firstOffLabel = fmtCm(firstBoardW)+' cm'+(Math.abs(firstBoardW-(0.575+rasterP))>0.001?' (prilag.)':'');
+  var defBoardW = r2((rasterP-0.05)+rasterP);
+  var firstOffLabel = fmtCm(firstBoardW)+' cm'+(Math.abs(firstBoardW-defBoardW)>0.001?' (prilag.)':'');
   var nLastP = Math.floor((W - firstOff) / rasterP);
   var lastCWxP = firstOff + nLastP * rasterP;
   if(lastCWxP >= W - 0.001){ nLastP--; lastCWxP -= rasterP; }
@@ -1054,7 +1100,7 @@ function renderPloce(){
   if(allWarns.length){ wlp.innerHTML=allWarns.map(function(w){return'<li>'+w+'</li>';}).join(''); wbp.style.display=''; }
   else wbp.style.display='none';
 
-  if(layers===2){ drawPloce('layer2', W, H, PH, r2(firstBoardW-SPACING), 1); $i('layer2block').style.display=''; }
+  if(layers===2){ drawPloce('layer2', W, H, PH, r2(firstBoardW-S.sirina_ploce_m/2), 1); $i('layer2block').style.display=''; }
   else $i('layer2block').style.display='none';
 
   renderRezniPlan();
@@ -1065,8 +1111,8 @@ function pieceThumbnail(colW, leftH, rightH, PH){
   // regardless of text length — no left/right overflow possible.
   var isTrapez=Math.abs(leftH-rightH)>0.005;
   var cW=150,cH=120,pL=25,pR=25,pT=5,pB=22;
-  var sc=Math.min((cW-pL-pR)/PLATE_W,(cH-pT-pB)/PH)*0.95;
-  var fpW=r2(PLATE_W*sc),fpH=r2(PH*sc);
+  var sc=Math.min((cW-pL-pR)/S.sirina_ploce_m,(cH-pT-pB)/PH)*0.95;
+  var fpW=r2(S.sirina_ploce_m*sc),fpH=r2(PH*sc);
   var fw=r2(colW*sc),fhL=r2(leftH*sc),fhR=r2(rightH*sc);
   var px=pL,botY=r2(pT+fpH);
   var tlY=r2(botY-fhL),trY=r2(botY-fhR);
@@ -1114,7 +1160,7 @@ function renderRezniPlan(){
   var isTrapez=S.oblik==='trapez';
   var layers=S.oblaganje==='dvostruko'?2:1;
   var firstBoardW=calcFirstBoardW();
-  var offsets=layers===2?[firstBoardW,r2(firstBoardW-SPACING)]:[firstBoardW];
+  var offsets=layers===2?[firstBoardW,r2(firstBoardW-S.sirina_ploce_m/2)]:[firstBoardW];
   var el=$i('rezni-plan-section');
 
   if(isTrapez){
@@ -1211,12 +1257,13 @@ function cardHtml(lbl,val,unit){
 function render(){
   readInputs();
   drawDimSketch();
+  drawPlateSketch();
   drawProfili();
   calcAndShowProfili();
   renderPloce();
 }
 
-var _ids=['i-duzina','i-visina','i-visina-L','i-visina-D','i-tip','i-oblaganje','i-durprof','i-vispl','i-razmak'];
+var _ids=['i-duzina','i-visina','i-visina-L','i-visina-D','i-tip','i-oblaganje','i-durprof','i-vispl','i-sirpl','i-razmak'];
 for(var _ii=0;_ii<_ids.length;_ii++){
   (function(el){
     if(!el) return;
