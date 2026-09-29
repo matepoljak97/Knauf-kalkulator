@@ -1128,11 +1128,32 @@ function drawPuzzlePlan(elId, W, H, PH, offset, layerParity, letters){
       var ny1=r2(py+ph-(p.notch.dBottom+p.notch.h)*sc), ny2=r2(py+ph-p.notch.dBottom*sc);
       s+='<rect x="'+nx1+'" y="'+ny1+'" width="'+r2(nx2-nx1)+'" height="'+r2(ny2-ny1)+'" fill="#f4f3ee" stroke="#2c2c2a" stroke-width="1" stroke-dasharray="3 2"/>';
     }
-    // Dimenzije uz rubove — isti stil kao na glavnoj slici ploča.
-    if(pw>=24) s+='<text x="'+r2(px+pw/2)+'" y="'+r2(py+11)+'" text-anchor="middle" font-size="10" font-weight="600" fill="'+txtColor+'">'+fmtCm(p.w)+'</text>';
-    if(ph>=24){
-      var plhx=r2(px+8), plhy=r2(py+ph/2);
-      s+='<text x="'+plhx+'" y="'+plhy+'" text-anchor="middle" font-size="10" font-weight="600" fill="'+txtColor+'" transform="rotate(-90 '+plhx+' '+plhy+')">'+fmtCm(p.h)+'</text>';
+    // Dimenzije uz rubove — segmentirano na "do zareza / zarez / od zareza"
+    // kad komad ima otvor, isto kao u reznom planu (pieceThumbnail).
+    var hasNotch = p.hasOpening && p.notch;
+    var wPts=[0,p.w];
+    if(hasNotch){
+      if(p.notch.dLeft>0.005) wPts.push(p.notch.dLeft);
+      if(p.notch.dRight>0.005) wPts.push(r2(p.w-p.notch.dRight));
+    }
+    wPts=wPts.filter(function(v,i,a){return a.indexOf(v)===i;}).sort(function(a,b){return a-b;});
+    for(var wi=0;wi<wPts.length-1;wi++){
+      var wSegPx=(wPts[wi+1]-wPts[wi])*sc;
+      if(wSegPx<18) continue;
+      var wMidPx=r2(px+(wPts[wi]+wPts[wi+1])/2*sc);
+      s+='<text x="'+wMidPx+'" y="'+r2(py+11)+'" text-anchor="middle" font-size="'+(hasNotch?9:10)+'" font-weight="600" fill="'+txtColor+'">'+fmtCm(r2(wPts[wi+1]-wPts[wi]))+'</text>';
+    }
+    var hPts=[0,p.h];
+    if(hasNotch){
+      if(p.notch.dBottom>0.005) hPts.push(p.notch.dBottom);
+      if(p.notch.dTop>0.005) hPts.push(r2(p.h-p.notch.dTop));
+    }
+    hPts=hPts.filter(function(v,i,a){return a.indexOf(v)===i;}).sort(function(a,b){return a-b;});
+    for(var hi=0;hi<hPts.length-1;hi++){
+      var hSegPx=(hPts[hi+1]-hPts[hi])*sc;
+      if(hSegPx<18) continue;
+      var plhx=r2(px+8), plhy=r2(py+ph-(hPts[hi]+hPts[hi+1])/2*sc);
+      s+='<text x="'+plhx+'" y="'+plhy+'" text-anchor="middle" font-size="'+(hasNotch?9:10)+'" font-weight="600" fill="'+txtColor+'" transform="rotate(-90 '+plhx+' '+plhy+')">'+fmtCm(r2(hPts[hi+1]-hPts[hi]))+'</text>';
     }
     var lk = letters[pieceKey(p,false)];
     if(lk && pw>=18 && ph>=18){
