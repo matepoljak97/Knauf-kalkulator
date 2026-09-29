@@ -327,7 +327,7 @@ function drawDimSketch(){
 // trenutno odabranu širinu/visinu ploče iz gornjih polja.
 function drawPlateSketch(){
   var w=S.sirina_ploce_m, h=S.visina_ploce_m;
-  var cW=150, cH=170, pL=16, pR=34, pT=12, pB=30;
+  var cW=150, cH=150, pL=16, pR=34, pT=12, pB=28;
   var sc=Math.min((cW-pL-pR)/w, (cH-pT-pB)/h);
   var fw=r2(w*sc), fh=r2(h*sc);
   var px=r2(pL+((cW-pL-pR)-fw)/2), py=pT;
@@ -346,7 +346,6 @@ function drawPlateSketch(){
   s+='<line x1="'+r2(dhX-3)+'" y1="'+r2(py+fh)+'" x2="'+r2(dhX+3)+'" y2="'+r2(py+fh)+'" stroke="#9a988f" stroke-width="1"/>';
   var hcx=r2(dhX+11), hcy=r2(py+fh/2);
   s+='<text x="'+hcx+'" y="'+hcy+'" text-anchor="middle" font-size="11" font-weight="600" fill="#0c447c" transform="rotate(-90 '+hcx+' '+hcy+')">'+fmtCm(h)+' cm</text>';
-  s+='<text x="'+(cW/2)+'" y="'+(cH-6)+'" text-anchor="middle" font-size="10" fill="#9a988f">1 gips ploča</text>';
   s+='</svg>';
   $i('plate-sketch-wrap').innerHTML=s;
 }
