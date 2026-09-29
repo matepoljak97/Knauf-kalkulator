@@ -198,8 +198,6 @@ h2 { font-size: 16px; font-weight: 600; margin: 0 0 8px; }
 
 <script>
 // ── CONSTANTS ────────────────────────────────────────────────
-var MIN_KOMAD = 0.30;  // m
-
 var COLORS = ['#e74c3c','#e67e22','#9b59b6','#1abc9c','#e91e63'];
 function otvorColor(i){ return COLORS[i % COLORS.length]; }
 
@@ -1043,36 +1041,65 @@ function calcOptimizacija(){
       }
     }
     var pieces = collectPieces(W, PH, offsets[li], layers===2 ? li : undefined);
-    for(var pi=0;pi<pieces.length;pi++) needs.push(pieces[pi].w);
+    for(var pi=0;pi<pieces.length;pi++) needs.push({w:pieces[pi].w, h:pieces[pi].h});
   }
 
   // Zid ima dvije strane — udvostručimo potrebe za drugu stranu
-  needs = needs.concat(needs.slice(0));
+  needs = needs.concat(needs.map(function(n){ return {w:n.w, h:n.h}; }));
 
-  // Sort largest first (best-fit decreasing)
-  needs.sort(function(a,b){return b-a;});
+  // Sort najviši prvo (pa najširi) — bolje popunjavanje polica
+  needs.sort(function(a,b){ return b.h-a.h || b.w-a.w; });
 
-  var bin=[], plates=0;
+  // 2D "police" raspoređivanje (ne samo po širini kao prije): svaka otvorena
+  // ploča ima police (vodoravne trake preostale visine). Komad ide na
+  // najbolju postojeću policu ISTE visine gdje stane širinom (iskorištava
+  // preostalu ŠIRINU police) — polica mora imati TOČNO istu visinu kao komad,
+  // inače bi niži komad "sjeo" u policu za viši i sakrio izgubljeni prostor
+  // iznad sebe koji se nigdje ne bi zabilježio kao otpad. Ako nema, otvara se
+  // nova polica na postojećoj ploči ako ima preostale VISINE; tek ako ništa
+  // ne odgovara, kupuje se nova ploča. Ovo iz jedne ploče stvarno izvuče što
+  // više komada — i po širini i po visini — umjesto da svaki "red" traži
+  // svoju ploču.
+  var pw=S.sirina_ploce_m;
+  var boards=[], plates=0;
   for(var i=0;i<needs.length;i++){
-    var need=needs[i];
-    var bestIdx=-1, bestRem=Infinity;
-    for(var j=0;j<bin.length;j++){
-      if(bin[j]>=need-0.001){
-        var rem=bin[j]-need;
-        if(rem<bestRem){ bestRem=rem; bestIdx=j; }
+    var n=needs[i], placed=false;
+    var bBoard=-1, bShelf=-1, bRemW=Infinity;
+    for(var bi=0;bi<boards.length;bi++){
+      var board=boards[bi];
+      for(var si=0;si<board.shelves.length;si++){
+        var shelf=board.shelves[si];
+        if(shelf.remW>=n.w-0.001 && Math.abs(shelf.h-n.h)<0.005 && shelf.remW-n.w<bRemW){
+          bRemW=shelf.remW-n.w; bBoard=bi; bShelf=si;
+        }
       }
     }
-    if(bestIdx>=0){
-      bin.splice(bestIdx,1);
-      if(bestRem>=MIN_KOMAD) bin.push(r2(bestRem));
+    if(bBoard>=0){
+      var sh=boards[bBoard].shelves[bShelf];
+      sh.remW=r2(sh.remW-n.w);
+      placed=true;
     } else {
+      var bBoard2=-1, bRemH=Infinity;
+      for(var bi2=0;bi2<boards.length;bi2++){
+        if(boards[bi2].remH>=n.h-0.001 && boards[bi2].remH-n.h<bRemH){ bRemH=boards[bi2].remH-n.h; bBoard2=bi2; }
+      }
+      if(bBoard2>=0){
+        boards[bBoard2].shelves.push({h:n.h, remW:r2(pw-n.w)});
+        boards[bBoard2].remH=r2(boards[bBoard2].remH-n.h);
+        placed=true;
+      }
+    }
+    if(!placed){
       plates++;
-      var cut=r2(S.sirina_ploce_m-need);
-      if(cut>=MIN_KOMAD) bin.push(cut);
+      boards.push({ shelves:[{h:n.h, remW:r2(pw-n.w)}], remH:r2(PH-n.h) });
     }
   }
   var otpad=0;
-  for(var i=0;i<bin.length;i++) otpad+=bin[i];
+  for(var bi3=0;bi3<boards.length;bi3++){
+    var b=boards[bi3];
+    for(var si3=0;si3<b.shelves.length;si3++) otpad += b.shelves[si3].remW*b.shelves[si3].h;
+    otpad += b.remH*pw;
+  }
   return { plates:plates, rezovi:needs.length, otpad:r2(otpad), warns:warns };
 }
 
@@ -1106,7 +1133,7 @@ function renderPloce(){
 
   var wbp=$i('warn-box-ploce'), wlp=$i('warn-list-ploce');
   var allWarns = opt.warns.slice();
-  if(opt.otpad>0) allWarns.push('Neupotrjebljeni ostaci (ostatak &lt; 30 cm): '+opt.otpad.toFixed(2)+' m ukupno');
+  if(opt.otpad>0.01) allWarns.push('Neiskorišteni ostaci nakon rasporeda: '+opt.otpad.toFixed(2)+' m&#178; ukupno');
   if(allWarns.length){ wlp.innerHTML=allWarns.map(function(w){return'<li>'+w+'</li>';}).join(''); wbp.style.display=''; }
   else wbp.style.display='none';
 
