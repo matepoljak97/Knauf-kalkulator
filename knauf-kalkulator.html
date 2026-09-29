@@ -156,7 +156,7 @@ h2 { font-size: 16px; font-weight: 600; margin: 0 0 8px; }
         <thead><tr><th style="width:58%">Stavka</th><th>Količina</th><th>Jedinica</th></tr></thead>
         <tbody id="prof-tbody"></tbody>
       </table>
-      <p style="font-size:12px;color:#9a988f;margin:8px 0 0">* UW tračnica i brtvena traka uključuju 10% rezerve za otpad i rezanje. CW/UA stupovi su točan potreban broj (bez rezerve).</p>
+      <p style="font-size:12px;color:#9a988f;margin:8px 0 0">* Brtvena traka uključuje 10% rezerve za otpad i rezanje. UW/CW/UA su točna potrebna količina (bez rezerve).</p>
     </div>
   </div>
 
@@ -753,7 +753,9 @@ function calcAndShowProfili(){
     pragovi += S.otvori[i].tip==='prozor' ? p*2 : p;
   }
   var uwTotal = uwBase+pragovi;
-  var uwMeters = r2(uwTotal*1.10);
+  // Bez rezerve za otpad — dvije ravne dužine (pod/strop) rezane točno na
+  // mjeru, za razliku od CW-a nema puno prostora za gubitak pri rezanju.
+  var uwMeters = r2(uwTotal);
 
   // CW + UA
   var cwPos = calcCWPositions();
@@ -765,9 +767,13 @@ function calcAndShowProfili(){
     else if(cwPos[i].type==='door_stub') nStub++;
   }
   var dCW = r2(visina-0.01);
-  // Točan broj pozicija (bez rezerve) — CW je diskretan popis stupova, ne dužinski
-  // materijal, pa 10% rezerva za otpad ovdje nema smisla kao kod UW/trake.
-  var nCW = nBasic+nReinf+nStub;
+  // CW profili dolaze u fiksnoj dužini od 275cm sa skladišta/dobavljača. Ako
+  // je potrebna visina stupa (dCW) veća od toga, treba nastaviti/spojiti dva
+  // komada po stupu — bez rezerve za otpad, samo točan broj komada od 275cm.
+  var CW_STOCK_M = 2.75;
+  var cwPiecesPerStud = Math.ceil(dCW / CW_STOCK_M);
+  var nStudPositions = nBasic+nReinf+nStub;
+  var nCW = nStudPositions * cwPiecesPerStud;
 
   // Pričvrsna roba
   var area = duzina*visina*2;
@@ -778,6 +784,7 @@ function calcAndShowProfili(){
 
   // Warnings
   var warns=[];
+  if(cwPiecesPerStud>1) warns.push('Visina stupa ('+Math.round(dCW*100)+' cm) ve&#263;a od standardne du&#382;ine CW profila (275 cm) — potreban nastavak/spajanje '+cwPiecesPerStud+' komada po stupu.');
   for(var i=0;i<S.otvori.length;i++){
     var o=S.otvori[i];
     if(o.x_m+o.sirina_m > duzina+0.001)
@@ -793,7 +800,8 @@ function calcAndShowProfili(){
   var uaTip = tip.replace('CW','UA');
   var rows=[
     ['UW profil ('+uwTip+')', uwMeters.toFixed(2), 'm', false],
-    ['CW profil ('+tip+')', nCW, 'kom ('+Math.round(dCW*100)+' cm svaki)', false],
+    ['CW profil ('+tip+')', nCW, 'kom (275 cm)', false],
+    ['&#8212; potrebnih pozicija (stupova) na zidu', nStudPositions, 'kom', true],
     ['&#8212; od toga raster', nBasic, 'kom', true],
     ['&#8212; od toga poja&#269;anja prozora', nReinf, 'kom', true],
     ['&#8212; od toga kratki iznad vrata', nStub, 'kom', true],
