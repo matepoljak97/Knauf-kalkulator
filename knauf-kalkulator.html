@@ -2,7 +2,9 @@
 <html>
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Knauf kalkulator</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CjxyZWN0IHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjE0IiBmaWxsPSIjMTg1ZmE1Ii8+CjxyZWN0IHg9IjEzIiB5PSI5IiB3aWR0aD0iMjYiIGhlaWdodD0iNyIgcng9IjIiIGZpbGw9IiNmZmYiLz4KPHJlY3QgeD0iMTMiIHk9IjQ4IiB3aWR0aD0iMjYiIGhlaWdodD0iNyIgcng9IjIiIGZpbGw9IiNmZmYiLz4KPHJlY3QgeD0iMjMiIHk9IjkiIHdpZHRoPSI2IiBoZWlnaHQ9IjQ2IiBmaWxsPSIjZmZmIi8+CjxyZWN0IHg9IjM3IiB5PSIzMyIgd2lkdGg9IjE5IiBoZWlnaHQ9IjIzIiByeD0iMS41IiBmaWxsPSIjZmFjNzc1IiBzdHJva2U9IiNiYTc1MTciIHN0cm9rZS13aWR0aD0iMS42Ii8+CjxsaW5lIHgxPSI0Ni41IiB5MT0iMzMiIHgyPSI0Ni41IiB5Mj0iNTYiIHN0cm9rZT0iI2JhNzUxNyIgc3Ryb2tlLXdpZHRoPSIxLjIiIHN0cm9rZS1kYXNoYXJyYXk9IjIuNSAyIi8+Cjwvc3ZnPgo=">
 <style>
 * { box-sizing: border-box; }
 body { font-family: "Segoe UI", Tahoma, sans-serif; background: #f4f3ee; color: #2c2c2a; margin: 0; padding: 24px; font-size: 14px; }
@@ -28,7 +30,7 @@ h2 { font-size: 16px; font-weight: 600; margin: 0 0 8px; }
 .btn-del { background: #c0392b; }
 .btn-del:hover { background: #a93226; }
 /* Openings */
-.otvori-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.otvori-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
 .otvor-row { display: flex; gap: 8px; align-items: flex-end; background: #f9f8f4; border: 1px solid #e3e1d8; border-radius: 8px; padding: 9px 11px; margin-bottom: 7px; flex-wrap: wrap; }
 .otvor-row .field { flex: 1 1 90px; }
 .otvor-dot { width: 10px; height: 28px; border-radius: 3px; flex-shrink: 0; margin-bottom: 1px; }
@@ -55,7 +57,7 @@ h2 { font-size: 16px; font-weight: 600; margin: 0 0 8px; }
 .layer-note { font-weight: 400; color: #6b6a64; font-size: 13px; }
 .foot { text-align: center; color: #9a988f; font-size: 12px; margin-top: 16px; }
 /* Shape selector */
-.shape-row { display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #e3e1d8; border-radius:10px; padding:12px 16px; margin-bottom:14px; }
+.shape-row { display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #e3e1d8; border-radius:10px; padding:12px 16px; margin-bottom:14px; flex-wrap:wrap; }
 .shape-lbl { font-size:13px; font-weight:600; color:#6b6a64; white-space:nowrap; }
 .shape-btn { display:flex; align-items:center; gap:7px; padding:7px 14px; border:2px solid #cfcdc3; border-radius:8px; background:#fff; font-size:13px; color:#6b6a64; cursor:pointer; }
 .shape-btn.active { border-color:#185fa5; color:#185fa5; background:#f0f7ff; font-weight:600; }
@@ -64,6 +66,15 @@ h2 { font-size: 16px; font-weight: 600; margin: 0 0 8px; }
 .dim-sketch-panel { background:#fff; border:1px solid #e3e1d8; border-radius:10px; padding:10px 14px; margin-bottom:14px; position:relative; }
 #dim-sketch-wrap { position:relative; }
 #dim-inp { position:absolute; width:80px; height:30px; text-align:center; font-size:13px; font-weight:600; border:2px solid #185fa5; border-radius:6px; padding:0 4px; background:#fff; box-shadow:0 3px 12px rgba(0,0,0,.18); z-index:30; display:none; }
+/* Mobilni prikaz */
+@media (max-width: 480px) {
+  body { padding: 12px; font-size: 13px; }
+  .main-title { font-size: 22px; }
+  .inputs, .panel, .shape-row, .dim-sketch-panel { padding: 10px; }
+  .field { flex-basis: 100px; }
+  .card { flex-basis: 45%; }
+  .btn { padding: 9px 14px; }
+}
 </style>
 </head>
 <body>
