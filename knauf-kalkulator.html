@@ -112,13 +112,6 @@ h2 { font-size: 16px; font-weight: 600; margin: 0 0 8px; }
         <option value="dvostruko" selected>Dvostruko</option>
       </select>
     </div>
-    <div class="field"><label>Dužina profila (m)</label>
-      <select id="i-durprof">
-        <option value="3">3 m</option>
-        <option value="4" selected>4 m</option>
-        <option value="4.5">4,5 m</option>
-      </select>
-    </div>
     <div class="field"><label>Visina ploče (cm)</label>
       <select id="i-vispl">
         <option value="200" selected>200 cm</option>
@@ -204,7 +197,7 @@ var S = {
   duzina_m: 4.0, visina_m: 2.75,
   oblik: 'pravokutan', visina_L_m: 2.75, visina_D_m: 2.25,
   tip_profila: 'CW75', oblaganje: 'jednostruko',
-  duzina_profila_m: 4, visina_ploce_m: 2.0, sirina_ploce_m: 1.25,
+  visina_ploce_m: 2.0, sirina_ploce_m: 1.25,
   otvori: []
 };
 var _oid = 0;
@@ -233,7 +226,6 @@ function readInputs(){
   }
   S.tip_profila      = $i('i-tip').value;
   S.oblaganje        = $i('i-oblaganje').value;
-  S.duzina_profila_m = parseFloat($i('i-durprof').value);
   S.visina_ploce_m   = (parseFloat($i('i-vispl').value) || 200) / 100;
   S.sirina_ploce_m   = (parseFloat($i('i-sirpl').value) || 125) / 100;
   S.cw_razmak        = $i('i-razmak').value;
@@ -749,7 +741,7 @@ document.addEventListener('touchend',  onUp);
 function calcAndShowProfili(){
   var duzina=S.duzina_m;
   var visina = S.oblik==='trapez' ? r2((S.visina_L_m+S.visina_D_m)/2) : S.visina_m;
-  var tip=S.tip_profila, durProf=S.duzina_profila_m;
+  var tip=S.tip_profila;
 
   // UW pod+strop
   var uwBase = duzina*2;
@@ -761,7 +753,7 @@ function calcAndShowProfili(){
     pragovi += S.otvori[i].tip==='prozor' ? p*2 : p;
   }
   var uwTotal = uwBase+pragovi;
-  var nUW = Math.ceil(uwTotal*1.10/durProf);
+  var uwMeters = r2(uwTotal*1.10);
 
   // CW + UA
   var cwPos = calcCWPositions();
@@ -786,7 +778,6 @@ function calcAndShowProfili(){
 
   // Warnings
   var warns=[];
-  if(visina>durProf) warns.push('Visina zida ('+visina.toFixed(2)+' m) ve&#263;a od standardne du&#382;ine profila ('+durProf+' m) — potreban nastavak CW.');
   for(var i=0;i<S.otvori.length;i++){
     var o=S.otvori[i];
     if(o.x_m+o.sirina_m > duzina+0.001)
@@ -801,7 +792,7 @@ function calcAndShowProfili(){
   var uwTip = tip.replace('CW','UW');
   var uaTip = tip.replace('CW','UA');
   var rows=[
-    ['UW profil ('+uwTip+')', nUW, 'kom ('+durProf+' m)', false],
+    ['UW profil ('+uwTip+')', uwMeters.toFixed(2), 'm', false],
     ['CW profil ('+tip+')', nCW, 'kom ('+Math.round(dCW*100)+' cm svaki)', false],
     ['&#8212; od toga raster', nBasic, 'kom', true],
     ['&#8212; od toga poja&#269;anja prozora', nReinf, 'kom', true],
@@ -1263,7 +1254,7 @@ function render(){
   renderPloce();
 }
 
-var _ids=['i-duzina','i-visina','i-visina-L','i-visina-D','i-tip','i-oblaganje','i-durprof','i-vispl','i-sirpl','i-razmak'];
+var _ids=['i-duzina','i-visina','i-visina-L','i-visina-D','i-tip','i-oblaganje','i-vispl','i-sirpl','i-razmak'];
 for(var _ii=0;_ii<_ids.length;_ii++){
   (function(el){
     if(!el) return;
