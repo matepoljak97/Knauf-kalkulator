@@ -783,14 +783,14 @@ function plateCols(W, offset){
   while(x < W-0.001){ cols.push({x:x, w:Math.min(PLATE_W,W-x)}); x+=PLATE_W; }
   return cols;
 }
-function plateRows(H, PH, colIdx){
+function plateRows(H, PH, parity){
   if(H<=PH) return [{y:0,h:H,cut:false}];
   if(H<=2*PH){
     var rem=r2(H-PH);
-    return colIdx%2===0 ? [{y:0,h:PH,cut:false},{y:PH,h:rem,cut:true}]
+    return parity%2===0 ? [{y:0,h:PH,cut:false},{y:PH,h:rem,cut:true}]
                         : [{y:0,h:rem,cut:true},{y:rem,h:PH,cut:false}];
   }
-  var arr=[],y=0, off=(colIdx%2===1)?r2(PH/2):0;
+  var arr=[],y=0, off=(parity%2===1)?r2(PH/2):0;
   if(off>0){arr.push({y:0,h:off,cut:true});y=off;}
   while(y<H-0.001){ var h=Math.min(PH,H-y); arr.push({y:y,h:r2(h),cut:h<PH}); y+=PH; }
   return arr;
@@ -803,14 +803,24 @@ function plateRows(H, PH, colIdx){
 //   ploča ide preko otvora kao cjelina, a otvor se izreže kao rupa u njoj
 //   (hasOpening=true). Materijal se štedi SAMO kad je čitava ćelija (stupac
 //   × red) u potpunosti unutar otvora — tad ta ćelija uopće nije potrebna.
-function collectPieces(W, PH, offset){
+//
+// layerParity (0/1) — kod DVOSLOJNOG oblaganja MORA biti fiksan po cijelom
+// sloju (ne po stupcu!), inače se horizontalni spoj sloja 1 i sloja 2 zna
+// slučajno poklopiti na istoj visini na istom mjestu zida (jer je raster
+// sloja 2 pomaknut za pola ploče, pa se "parnost" stupca po indeksu ne
+// poklapa predvidivo sa slojem 1 duž cijelog zida). Fiksni parity po sloju
+// to jamči: sloj 1 uvijek reže na jednoj visini, sloj 2 uvijek na drugoj,
+// bez obzira na poziciju. Kod jednoslojnog oblaganja (layerParity=undefined)
+// koristi se stari raspored po stupcu (razbija dugu vodoravnu liniju spoja).
+function collectPieces(W, PH, offset, layerParity){
   var isTrapez = S.oblik === 'trapez';
   var cols = plateCols(W, offset);
   var pieces = [];
   for(var c=0; c<cols.length; c++){
     var col = cols[c];
     var colH = isTrapez ? wallTopAt(col.x) : S.visina_m;
-    var rows = plateRows(colH, PH, c);
+    var rowParity = (layerParity!==undefined) ? layerParity : c;
+    var rows = plateRows(colH, PH, rowParity);
     for(var ri=0; ri<rows.length; ri++){
       var rw = rows[ri];
       var rwTop = r2(rw.y+rw.h);
@@ -835,14 +845,14 @@ function collectPieces(W, PH, offset){
         rightH = r2(wallTopAt(col.x+col.w)-rw.y);
       }
       pieces.push({ x:col.x, w:col.w, y:rw.y, h:rw.h, leftH:leftH, rightH:rightH,
-                    isCeiling:isCeiling, colIdx:c, cutW:col.w<PLATE_W-0.005, rowCut:rw.cut,
+                    isCeiling:isCeiling, cutW:col.w<PLATE_W-0.005, rowCut:rw.cut,
                     hasOpening:hasOpening });
     }
   }
   return pieces;
 }
 
-function drawPloce(elId, W, H, PH, offset){
+function drawPloce(elId, W, H, PH, offset, layerParity){
   var isTrapez=S.oblik==='trapez';
   var HL=isTrapez?S.visina_L_m:H, HD=isTrapez?S.visina_D_m:H;
   var Hmax=isTrapez?Math.max(HL,HD):H;
@@ -862,7 +872,7 @@ function drawPloce(elId, W, H, PH, offset){
   // Komadi identični onima u reznom planu (collectPieces) — ploča preko otvora
   // se i dalje crta kao cijeli komad (bez spoja na rubu okvira, ispravno za
   // količinu materijala), ali se rupa za sam otvor vizualno izreže ispod.
-  var pieces = collectPieces(W, PH, offset);
+  var pieces = collectPieces(W, PH, offset, layerParity);
   for(var pi=0;pi<pieces.length;pi++){
     var p=pieces[pi];
     var isCut = p.cutW || p.rowCut;
@@ -972,7 +982,7 @@ function calcOptimizacija(){
           warns.push('Sloj '+(li+1)+': spoj ploča na '+Math.round(jx*100)+' cm je samo '+Math.round(d*100)+' cm od ugla otvora '+(oi+1)+' — sklono pucanju, razmotri pomak otvora ili ploče.');
       }
     }
-    var pieces = collectPieces(W, PH, offsets[li]);
+    var pieces = collectPieces(W, PH, offsets[li], layers===2 ? li : undefined);
     for(var pi=0;pi<pieces.length;pi++) needs.push(pieces[pi].w);
   }
 
@@ -1014,7 +1024,7 @@ function renderPloce(){
   var firstBoardW=calcFirstBoardW();
   var opt = calcOptimizacija();
 
-  drawPloce('layer1', W, H, PH, firstBoardW);
+  drawPloce('layer1', W, H, PH, firstBoardW, layers===2 ? 0 : undefined);
 
   var uw = r2(W*2);
   var wool = r2(W*H);
@@ -1039,7 +1049,7 @@ function renderPloce(){
   if(allWarns.length){ wlp.innerHTML=allWarns.map(function(w){return'<li>'+w+'</li>';}).join(''); wbp.style.display=''; }
   else wbp.style.display='none';
 
-  if(layers===2){ drawPloce('layer2', W, H, PH, r2(firstBoardW-SPACING)); $i('layer2block').style.display=''; }
+  if(layers===2){ drawPloce('layer2', W, H, PH, r2(firstBoardW-SPACING), 1); $i('layer2block').style.display=''; }
   else $i('layer2block').style.display='none';
 
   renderRezniPlan();
@@ -1106,7 +1116,7 @@ function renderRezniPlan(){
     // Trapezoid: ceiling piece has slanted top → leftH and rightH differ per column
     var rows_t=[];
     for(var li=0;li<offsets.length;li++){
-      var pieces=collectPieces(W,PH,offsets[li]);
+      var pieces=collectPieces(W,PH,offsets[li],layers===2?li:undefined);
       for(var pi=0;pi<pieces.length;pi++){
         var p=pieces[pi];
         var needCut = p.isCeiling
@@ -1151,7 +1161,7 @@ function renderRezniPlan(){
   // Rectangular: group by unique (width × height, sadrži li otvor) → kartice
   var map={};
   for(var li=0;li<offsets.length;li++){
-    var pieces=collectPieces(W,PH,offsets[li]);
+    var pieces=collectPieces(W,PH,offsets[li],layers===2?li:undefined);
     for(var pi=0;pi<pieces.length;pi++){
       var p=pieces[pi];
       if(!p.cutW && !p.rowCut && !p.hasOpening) continue;
