@@ -1036,6 +1036,24 @@ function drawPloce(elId, W, H, PH, offset, layerParity, letters){
       s+='<rect x="'+ox2+'" y="'+oy2+'" width="'+ow2+'" height="'+oh2+'" fill="#fff" stroke="none"/>';
       s+='<rect x="'+ox2+'" y="'+oy2+'" width="'+ow2+'" height="'+oh2+'" fill="none" stroke="#2c2c2a" stroke-width="1.5" stroke-dasharray="5 3"/>';
       if(ow2>24 && oh2>14) s+='<text x="'+r2(parseFloat(ox2)+ow2/2)+'" y="'+r2(parseFloat(oy2)+oh2/2+4)+'" text-anchor="middle" font-size="11" fill="#6b6a64">'+(ov.tip==='vrata'?'VRATA':'PROZOR')+'</text>';
+      // Kote širine (gornji rub) i visine (lijevi rub) samog otvora — isti
+      // stil kotiranja kao kod komada ploča.
+      var oxN0=parseFloat(ox2), oyN0=parseFloat(oy2);
+      if(ow2>36){
+        var odwY=r2(oyN0+16);
+        s+='<line x1="'+ox2+'" y1="'+odwY+'" x2="'+r2(oxN0+ow2)+'" y2="'+odwY+'" stroke="#aaa8a0" stroke-width="1"/>';
+        s+='<line x1="'+ox2+'" y1="'+r2(odwY-3)+'" x2="'+ox2+'" y2="'+r2(odwY+3)+'" stroke="#aaa8a0" stroke-width="1"/>';
+        s+='<line x1="'+r2(oxN0+ow2)+'" y1="'+r2(odwY-3)+'" x2="'+r2(oxN0+ow2)+'" y2="'+r2(odwY+3)+'" stroke="#aaa8a0" stroke-width="1"/>';
+        s+='<text x="'+r2(oxN0+ow2/2)+'" y="'+r2(odwY+13)+'" text-anchor="middle" font-size="10.5" font-weight="600" fill="#5f5e5a">'+fmtCm(ov.sirina_m)+' cm</text>';
+      }
+      if(oh2>36){
+        var odhX=r2(oxN0+16);
+        s+='<line x1="'+odhX+'" y1="'+oy2+'" x2="'+odhX+'" y2="'+r2(oyN0+oh2)+'" stroke="#aaa8a0" stroke-width="1"/>';
+        s+='<line x1="'+r2(odhX-3)+'" y1="'+oy2+'" x2="'+r2(odhX+3)+'" y2="'+oy2+'" stroke="#aaa8a0" stroke-width="1"/>';
+        s+='<line x1="'+r2(odhX-3)+'" y1="'+r2(oyN0+oh2)+'" x2="'+r2(odhX+3)+'" y2="'+r2(oyN0+oh2)+'" stroke="#aaa8a0" stroke-width="1"/>';
+        var ohcx=r2(odhX-11), ohcy=r2(oyN0+oh2/2);
+        s+='<text x="'+ohcx+'" y="'+ohcy+'" text-anchor="middle" font-size="10.5" font-weight="600" fill="#5f5e5a" transform="rotate(-90 '+ohcx+' '+ohcy+')">'+fmtCm(ov.visina_m)+' cm</text>';
+      }
       // Dijagonalno ojačanje kutova (traka/mrežica preko dijagonale) — standardna
       // mjera protiv pucanja gleta na uglovima otvora, mjestu najveceg naprezanja.
       // Vrata nemaju donje uglove u ploči (otvor ide do poda).
