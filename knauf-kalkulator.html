@@ -881,15 +881,16 @@ function collectPieces(W, PH, offset, layerIdx){
     for(var ri=0; ri<rows.length; ri++){
       var rw = rows[ri];
       var rwTop = r2(rw.y+rw.h);
-      var voided=false, hasOpening=false;
+      var voided=false, hasOpening=false, notchRect=null;
       for(var oi=0; oi<S.otvori.length; oi++){
         var o=S.otvori[oi];
         var oyBot = o.tip==='vrata' ? 0 : o.sill_m;
         var oyTop = oyBot + o.visina_m;
-        var xOverlap = Math.min(col.x+col.w, o.x_m+o.sirina_m) - Math.max(col.x, o.x_m);
-        var yOverlap = Math.min(rwTop, oyTop) - Math.max(rw.y, oyBot);
-        if(xOverlap<=0.005 || yOverlap<=0.005) continue; // otvor ne dira ovu ćeliju
+        var nx1=Math.max(col.x,o.x_m), nx2=Math.min(col.x+col.w,o.x_m+o.sirina_m);
+        var ny1=Math.max(rw.y,oyBot), ny2=Math.min(rwTop,oyTop);
+        if(nx2-nx1<=0.005 || ny2-ny1<=0.005) continue; // otvor ne dira ovu ćeliju
         hasOpening = true;
+        if(!notchRect) notchRect = {x1:nx1, x2:nx2, y1:ny1, y2:ny2};
         if(o.x_m<=col.x+0.005 && o.x_m+o.sirina_m>=col.x+col.w-0.005 && oyBot<=rw.y+0.005 && oyTop>=rwTop-0.005){
           voided = true; break; // otvor u potpunosti pokriva cijelu ćeliju
         }
@@ -901,9 +902,23 @@ function collectPieces(W, PH, offset, layerIdx){
         leftH = r2(wallTopAt(col.x)-rw.y);
         rightH = r2(wallTopAt(col.x+col.w)-rw.y);
       }
+      // Zarez (notch) unutar OVOG komada, relativno na njegove vlastite
+      // rubove — treba za potpuno kotiranje L-oblika u reznom planu (koliko
+      // je zarez udaljen od lijevog/donjeg ruba baš ove ploče, ne cijelog zida).
+      var notch = null;
+      if(notchRect){
+        notch = {
+          dLeft:  r2(notchRect.x1-col.x),
+          dRight: r2((col.x+col.w)-notchRect.x2),
+          dBottom:r2(notchRect.y1-rw.y),
+          dTop:   r2(rwTop-notchRect.y2),
+          w: r2(notchRect.x2-notchRect.x1),
+          h: r2(notchRect.y2-notchRect.y1)
+        };
+      }
       pieces.push({ x:col.x, w:col.w, y:rw.y, h:rw.h, leftH:leftH, rightH:rightH,
                     isCeiling:isCeiling, cutW:col.w<S.sirina_ploce_m-0.005, rowCut:rw.cut,
-                    hasOpening:hasOpening });
+                    hasOpening:hasOpening, notch:notch });
     }
   }
   return pieces;
@@ -921,11 +936,16 @@ function pieceNeedsLabel(p, isTrapez, PH){
   return p.cutW || p.rowCut || p.hasOpening;
 }
 // Ključ po kojem se komadi grupiraju — isti ključ = isto slovo, isto kao
-// grupiranje u reznom planu (renderRezniPlan).
+// grupiranje u reznom planu (renderRezniPlan). Komadi s otvorom uključuju i
+// točnu poziciju zareza — dvije ploče iste veličine ali s otvorom na
+// drugačijem mjestu NISU isti oblik za rezanje, pa ne smiju dijeliti slovo.
 function pieceKey(p, isTrapez){
-  return isTrapez
-    ? (fmtCm(p.w)+'x'+fmtCm(p.leftH)+'x'+fmtCm(p.rightH))
-    : (fmtCm(p.w)+'x'+fmtCm(p.h)+(p.hasOpening?'-otv':''));
+  if(isTrapez) return fmtCm(p.w)+'x'+fmtCm(p.leftH)+'x'+fmtCm(p.rightH);
+  var k = fmtCm(p.w)+'x'+fmtCm(p.h);
+  if(p.hasOpening){
+    k += p.notch ? '-otv-'+fmtCm(p.notch.dLeft)+'-'+fmtCm(p.notch.dBottom)+'-'+fmtCm(p.notch.w)+'-'+fmtCm(p.notch.h) : '-otv';
+  }
+  return k;
 }
 // Dodijeli slovo (A, B, C...) svakoj RAZLIČITOJ veličini komada koji ide u
 // rezni plan — isto slovo na skici zida i u reznom planu, da se lakše zna
@@ -1223,11 +1243,12 @@ function renderPloce(){
   renderRezniPlan();
 }
 
-function pieceThumbnail(colW, leftH, rightH, PH){
+function pieceThumbnail(colW, leftH, rightH, PH, notch){
   // Height labels use rotate(-90°) text so they take ~10 px horizontally
   // regardless of text length — no left/right overflow possible.
   var isTrapez=Math.abs(leftH-rightH)>0.005;
-  var cW=150,cH=120,pL=25,pR=25,pT=5,pB=22;
+  var hasNotch = !!notch && !isTrapez;
+  var cW=hasNotch?190:150, cH=hasNotch?150:120, pL=25,pR=25,pT=5,pB=22;
   var sc=Math.min((cW-pL-pR)/S.sirina_ploce_m,(cH-pT-pB)/PH)*0.95;
   var fpW=r2(S.sirina_ploce_m*sc),fpH=r2(PH*sc);
   var fw=r2(colW*sc),fhL=r2(leftH*sc),fhR=r2(rightH*sc);
@@ -1242,12 +1263,32 @@ function pieceThumbnail(colW, leftH, rightH, PH){
   } else {
     s+='<rect x="'+px+'" y="'+tlY+'" width="'+fw+'" height="'+fhL+'" fill="#fac775" stroke="#ba7517" stroke-width="1.5"/>';
   }
-  // width dim line (below piece)
+  // Zarez (otvor izrezan u komadu) — bijela rupa unutar komada, na točnoj
+  // poziciji relativno na rubove OVOG komada.
+  if(hasNotch){
+    var nx1=r2(px+notch.dLeft*sc), nx2=r2(px+(notch.dLeft+notch.w)*sc);
+    var ny1=r2(botY-(notch.dBottom+notch.h)*sc), ny2=r2(botY-notch.dBottom*sc);
+    s+='<rect x="'+nx1+'" y="'+ny1+'" width="'+r2(nx2-nx1)+'" height="'+r2(ny2-ny1)+'" fill="#fff" stroke="#2c2c2a" stroke-width="1" stroke-dasharray="3 2"/>';
+  }
+  // width dim line (below piece) — segmentirano na "do zareza / zarez / od zareza" ako ima zarez
   var dwY=r2(botY+5);
+  var wPts=[0,colW];
+  if(hasNotch){
+    if(notch.dLeft>0.005) wPts.push(notch.dLeft);
+    if(notch.dRight>0.005) wPts.push(r2(colW-notch.dRight));
+  }
+  wPts=wPts.filter(function(v,i,a){return a.indexOf(v)===i;}).sort(function(a,b){return a-b;});
   s+='<line x1="'+px+'" y1="'+dwY+'" x2="'+r2(px+fw)+'" y2="'+dwY+'" stroke="#9a988f" stroke-width="1"/>';
-  s+='<line x1="'+px+'" y1="'+r2(dwY-3)+'" x2="'+px+'" y2="'+r2(dwY+3)+'" stroke="#9a988f" stroke-width="1"/>';
-  s+='<line x1="'+r2(px+fw)+'" y1="'+r2(dwY-3)+'" x2="'+r2(px+fw)+'" y2="'+r2(dwY+3)+'" stroke="#9a988f" stroke-width="1"/>';
-  s+='<text x="'+r2(px+fw/2)+'" y="'+r2(dwY+12)+'" text-anchor="middle" font-size="11" font-weight="bold" fill="#633806">'+fmtCm(colW)+' cm</text>';
+  for(var wi=0;wi<wPts.length;wi++){
+    var wtx=r2(px+wPts[wi]*sc);
+    s+='<line x1="'+wtx+'" y1="'+r2(dwY-3)+'" x2="'+wtx+'" y2="'+r2(dwY+3)+'" stroke="#9a988f" stroke-width="1"/>';
+  }
+  for(var wi=0;wi<wPts.length-1;wi++){
+    var wSegPx=(wPts[wi+1]-wPts[wi])*sc;
+    if(wSegPx<14) continue;
+    var wMidPx=r2(px+(wPts[wi]+wPts[wi+1])/2*sc);
+    s+='<text x="'+wMidPx+'" y="'+r2(dwY+12)+'" text-anchor="middle" font-size="'+(hasNotch?9.5:11)+'" font-weight="bold" fill="#633806">'+fmtCm(r2(wPts[wi+1]-wPts[wi]))+'</text>';
+  }
   // left height dim line + rotated label (trapezoid only)
   if(isTrapez){
     var dlX=r2(px-6);
@@ -1259,15 +1300,27 @@ function pieceThumbnail(colW, leftH, rightH, PH){
     s+='<text x="'+lcx+'" y="'+lMid+'" text-anchor="middle" font-size="10" font-weight="bold" fill="#633806"'
       +' transform="rotate(-90 '+lcx+' '+lMid+')">'+fmtCm(leftH)+' cm</text>';
   }
-  // right height dim line + rotated label
+  // right height dim line — segmentirano na "do zareza / zarez / od zareza" ako ima zarez
   var drX=r2(px+fw+6);
+  var hPts=[0,leftH];
+  if(hasNotch){
+    if(notch.dBottom>0.005) hPts.push(notch.dBottom);
+    if(notch.dTop>0.005) hPts.push(r2(leftH-notch.dTop));
+  }
+  hPts=hPts.filter(function(v,i,a){return a.indexOf(v)===i;}).sort(function(a,b){return a-b;});
   s+='<line x1="'+drX+'" y1="'+trY+'" x2="'+drX+'" y2="'+botY+'" stroke="#9a988f" stroke-width="1"/>';
-  s+='<line x1="'+r2(drX-3)+'" y1="'+trY+'" x2="'+r2(drX+3)+'" y2="'+trY+'" stroke="#9a988f" stroke-width="1"/>';
-  s+='<line x1="'+r2(drX-3)+'" y1="'+botY+'" x2="'+r2(drX+3)+'" y2="'+botY+'" stroke="#9a988f" stroke-width="1"/>';
-  var rMid=r2((parseFloat(trY)+parseFloat(botY))/2);
-  var rcx=r2(px+fw+16);
-  s+='<text x="'+rcx+'" y="'+rMid+'" text-anchor="middle" font-size="10" font-weight="bold" fill="#633806"'
-    +' transform="rotate(-90 '+rcx+' '+rMid+')">'+fmtCm(isTrapez?rightH:leftH)+' cm</text>';
+  for(var hi=0;hi<hPts.length;hi++){
+    var hty=r2(botY-hPts[hi]*sc);
+    s+='<line x1="'+r2(drX-3)+'" y1="'+hty+'" x2="'+r2(drX+3)+'" y2="'+hty+'" stroke="#9a988f" stroke-width="1"/>';
+  }
+  for(var hi=0;hi<hPts.length-1;hi++){
+    var hSegPx=(hPts[hi+1]-hPts[hi])*sc;
+    if(hSegPx<14) continue;
+    var hMidY=r2(botY-(hPts[hi]+hPts[hi+1])/2*sc);
+    var rcx=r2(px+fw+(hasNotch?14:16));
+    s+='<text x="'+rcx+'" y="'+hMidY+'" text-anchor="middle" font-size="'+(hasNotch?9.5:10)+'" font-weight="bold" fill="#633806"'
+      +' transform="rotate(-90 '+rcx+' '+hMidY+')">'+fmtCm(r2(hPts[hi+1]-hPts[hi]))+'</text>';
+  }
   s+='</svg>';
   return s;
 }
@@ -1333,8 +1386,8 @@ function renderRezniPlan(){
     for(var pi=0;pi<pieces.length;pi++){
       var p=pieces[pi];
       if(!p.cutW && !p.rowCut && !p.hasOpening) continue;
-      var key=fmtCm(p.w)+'x'+fmtCm(p.h)+(p.hasOpening?'-otv':'');
-      if(!map[key]) map[key]={w:p.w,h:p.h,count:0,inLayers:{},hasOpening:p.hasOpening,letter:letters[key]};
+      var key=pieceKey(p,false);
+      if(!map[key]) map[key]={w:p.w,h:p.h,count:0,inLayers:{},hasOpening:p.hasOpening,notch:p.notch,letter:letters[key]};
       map[key].count++;
       map[key].inLayers[li+1]=true;
     }
@@ -1355,7 +1408,7 @@ function renderRezniPlan(){
     var otvBadge = p.hasOpening ? '<div style="font-size:11px;color:#185fa5;font-weight:600">sadrži otvor — izrezati rupu</div>' : '';
     var letterBadge = p.letter ? '<div style="width:26px;height:26px;line-height:26px;border-radius:50%;background:#185fa5;color:#fff;font-weight:700;font-size:14px;margin:0 auto 6px">'+p.letter+'</div>' : '';
     html+='<div style="text-align:center;background:#fff;border:1px solid #e0dfd8;border-radius:6px;padding:8px 10px">'
-      +letterBadge+pieceThumbnail(p.w,p.h,p.h,PH)
+      +letterBadge+pieceThumbnail(p.w,p.h,p.h,PH,p.notch)
       +layerBadge+otvBadge
       +'<div style="font-size:12px;color:#5f5e5a;font-weight:500;margin-top:4px">'+p.count+' kom</div>'
       +'</div>';
