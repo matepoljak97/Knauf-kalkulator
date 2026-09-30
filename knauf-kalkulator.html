@@ -249,14 +249,11 @@ function calcFirstOffset(){
   var DEF = r2(raster - 0.05); // 5cm skraćenje ruba ploče (ulegnuti rub)
   var W = S.duzina_m;
   if(W <= DEF + 0.001) return W / 2;
-  // Broj CW intervala od prvog profila do desnog zida (s defaultom 57.5cm)
-  var N = Math.floor((W - DEF) / raster);
-  // Udaljenost zadnjeg CW od desnog zida
-  var lastDist = W - DEF - N * raster;
-  // Ako je zadnji CW >= 25cm od zida — ostaviti default
-  if(lastDist >= 0.249) return DEF;
-  // Inače balansiraj: prvi profil = zadnji profil od zida
-  return (W - N * raster) / 2;
+  // Uvijek standardnih ~57.5cm — prva ploča ostaje ista bez obzira na dužinu
+  // zida. Ako to slučajno ostavi neki CW profil preblizu desnog zida, taj se
+  // suvišni profil uklanja u calcCWPositions (isto kao kod otvora), umjesto
+  // da se zbog jednog profila poremeti raspored SVIH ploča na zidu.
+  return DEF;
 }
 
 // Širina prve (skraćene) ploče: proteže se od ruba zida do DRUGOG profila
@@ -492,6 +489,20 @@ function calcCWPositions(){
       if(xm < 0.001 || xm > duzina-0.001) continue; // rub zida se nikad ne miče
       if(Math.min(Math.abs(xm-xL), Math.abs(xm-xR)) < MIN_GAP_OTVOR) delete map[k];
     }
+  }
+
+  // Ukloni raster stupove preblizu SAMOG RUBA ZIDA (unutar 15cm) — rub uvijek
+  // ima svoj stup (kut ili prisilni rubni stup), pa je dodatni stup toliko
+  // blizu suvišan i nepraktičan — isti princip kao gore kod otvora. Bez ovoga
+  // bi se cijeli raspored ploča morao paušalno balansirati zbog jednog
+  // rijetkog, nepotrebnog profila (npr. zid 197cm bez ovoga daje dvije
+  // ploče od 98.5cm umjesto jedne pune i jedne od 77cm).
+  var MIN_GAP_RUB = 0.15;
+  for(var k in map){
+    if(map[k].type!=='basic') continue;
+    var xmR = map[k].x_m;
+    if(xmR < 0.001 || xmR > duzina-0.001) continue; // sami rubovi se ne diraju
+    if(xmR < MIN_GAP_RUB || (duzina-xmR) < MIN_GAP_RUB) delete map[k];
   }
 
   // Uvijek stup na desnom rubu zida
