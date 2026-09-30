@@ -868,19 +868,45 @@ function plateRows(H, PH, colIdx, shift){
 //   × red) u potpunosti unutar otvora — tad ta ćelija uopće nije potrebna.
 //
 // layerIdx (0/1, undefined za jednoslojno) — kod DVOSLOJNOG oblaganja sloj 2
-// reže vodoravne spojeve na POMAKNUTOJ visini (shift=PH/4) u odnosu na sloj 1
-// (shift=0), uz zadržanu izmjenu po stupcu unutar oba sloja (nema ravne linije
-// duž cijelog sloja). Visine reza sloja 1 {rem, PH} i sloja 2 {rem+PH/4, PH-PH/4}
-// su potpuno disjunktni skupovi — spoj se NIKAD ne može poklopiti, bez obzira
-// na to što je raster sloja 2 pomaknut za pola ploče pa se stupci "krivo" miješaju.
+// za SVAKI stupac prvo pokuša bez pomaka (shift=0, isti raspored kao sloj 1)
+// i zadrži ga AKO njegov puni (PH) red ne upada na istu visinu kao puni red
+// bilo kojeg stupca sloja 1 koji se preklapa po X — u tom slučaju ta ploča
+// sloja 2 ostaje STVARNO cijela (nema razloga rezati je kad nema sudara).
+// Samo kad bi bez pomaka došlo do stvarnog sudara, taj se KONKRETNI stupac
+// pomakne (shift=PH/4) da izbjegne baš taj sudar. Prije je cijeli sloj 2
+// bio pomaknut paušalno, pa nijedna ploča nije ostajala cijela — iako je
+// većina stupaca zapravo bila potpuno sigurna bez pomaka.
 function collectPieces(W, PH, offset, layerIdx){
-  var shift = (layerIdx===1) ? PH/4 : 0;
   var isTrapez = S.oblik === 'trapez';
   var cols = plateCols(W, offset);
+  var layer1Cols = (layerIdx===1) ? plateCols(W, calcFirstBoardW()) : null;
   var pieces = [];
   for(var c=0; c<cols.length; c++){
     var col = cols[c];
     var colH = isTrapez ? wallTopAt(col.x) : S.visina_m;
+    var shift = 0;
+    if(layerIdx===1){
+      var trial = plateRows(colH, PH, c, 0);
+      var conflict = false;
+      for(var ti=0; ti<trial.length && !conflict; ti++){
+        if(trial[ti].cut) continue; // zanima nas samo puni (necut) red ove ploče
+        for(var l1i=0; l1i<layer1Cols.length && !conflict; l1i++){
+          var l1c = layer1Cols[l1i];
+          if(l1c.x+l1c.w<=col.x+0.005 || l1c.x>=col.x+col.w-0.005) continue; // bez X preklapanja
+          var l1H = isTrapez ? wallTopAt(l1c.x) : S.visina_m;
+          var l1rows = plateRows(l1H, PH, l1i, 0);
+          for(var l1r=0; l1r<l1rows.length; l1r++){
+            if(l1rows[l1r].cut) continue; // i njega zanima samo puni red
+            if(Math.abs(l1rows[l1r].y-trial[ti].y)<0.005){ conflict=true; break; }
+          }
+        }
+      }
+      // Minimalan pomak (5cm) — dovoljan da visine sloja 1/2 budu sigurno
+      // različite (bilo koji pomak >0 to jamči), ali ne reže više nego što
+      // mora; stariji pristup je paušalno rezao za četvrtinu ploče (PH/4)
+      // čak i kad je bio potreban tek minimalan pomak da izbjegne sudar.
+      shift = conflict ? 0.05 : 0;
+    }
     var rows = plateRows(colH, PH, c, shift);
     for(var ri=0; ri<rows.length; ri++){
       var rw = rows[ri];
