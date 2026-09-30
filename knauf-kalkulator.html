@@ -788,7 +788,11 @@ function calcAndShowProfili(){
   var slojF = S.oblaganje==='dvostruko' ? 2 : 1;
   var vijci = Math.ceil(area*slojF*23);
   var pricvr = Math.ceil(uwBase/0.6);
-  var traka  = r2(uwBase*1.10);
+  // Brtvena traka ide uz CIJELI opseg spoja s postojećom konstrukcijom — pod
+  // i strop (uwBase) TE oba bočna kraja zida gdje se profil spaja na susjedne
+  // zidove (visina zida na svakom kraju, stvarna za trapez, ne prosječna).
+  var sideLen = wallTopAt(0) + wallTopAt(duzina);
+  var traka = r2((uwBase+sideLen)*1.10);
 
   // Warnings
   var warns=[];
